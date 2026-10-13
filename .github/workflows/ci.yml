@@ -1,0 +1,32 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          {
+            POSTGRES_USER: localvoice,
+            POSTGRES_PASSWORD: localvoice,
+            POSTGRES_DB: localvoice,
+          }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U localvoice" --health-interval 5s --health-retries 5
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      DATABASE_URL: postgresql://localvoice:localvoice@localhost:5432/localvoice
+      REDIS_URL: redis://localhost:6379
+      PUBLIC_BASE_URL: https://example.com
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter api build
+      - run: pnpm --filter web build
+      - run: pnpm --filter api test --passWithNoTests
