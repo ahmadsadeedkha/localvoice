@@ -1,0 +1,12 @@
+procs:
+  docker:
+    shell: docker compose up postgres redis
+  backend:
+    cwd: <CONFIG_DIR>/backend
+    shell: pnpm start:dev
+  frontend:
+    cwd: <CONFIG_DIR>/frontend
+    shell: pnpm dev
+  admin:
+    cwd: <CONFIG_DIR>/admin
+    shell: pnpm dev
