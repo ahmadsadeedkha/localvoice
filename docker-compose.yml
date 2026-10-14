@@ -5,7 +5,7 @@ services:
       POSTGRES_USER: localvoice
       POSTGRES_PASSWORD: localvoice
       POSTGRES_DB: localvoice
-    ports: ["5432:5432"]
+    ports: ["5433:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U localvoice"]
