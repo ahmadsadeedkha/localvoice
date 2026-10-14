@@ -1,32 +1,75 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main, staging, "feature/**"]
+  pull_request:
+    branches: [main, staging]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  backend:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        app: [backend, frontend, admin]
     defaults:
       run:
-        working-directory: ${{ matrix.app }}
+        working-directory: backend
     services:
       postgres:
         image: postgres:16
         env:
-          {
-            POSTGRES_USER: localvoice,
-            POSTGRES_PASSWORD: localvoice,
-            POSTGRES_DB: localvoice,
-          }
+          POSTGRES_USER: localvoice
+          POSTGRES_PASSWORD: localvoice
+          POSTGRES_DB: localvoice
         ports: ["5432:5432"]
-        options: --health-cmd "pg_isready -U localvoice" --health-interval 5s --health-retries 5
+        options: >-
+          --health-cmd "pg_isready -U localvoice"
+          --health-interval 5s
+          --health-retries 5
       redis:
         image: redis:7
         ports: ["6379:6379"]
     env:
+      NODE_ENV: test
       DATABASE_URL: postgresql://localvoice:localvoice@localhost:5432/localvoice
       REDIS_URL: redis://localhost:6379
       PUBLIC_BASE_URL: https://example.com
+      # Add these when the Clerk variables become required in env.ts.
+      # Dummy values only; real secrets belong in GitHub Secrets.
+      CLERK_PUBLISHABLE_KEY: pk_test_dummy
+      CLERK_SECRET_KEY: sk_test_dummy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 12 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm migration:run
+      - run: pnpm run --if-present test --passWithNoTests
+
+  web:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [frontend, admin]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    # env:
+      # Publishable keys are public by design. Create a repository variable
+      # named CLERK_PUBLISHABLE_KEY once you have your dev instance key.
+      # NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+      # VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
