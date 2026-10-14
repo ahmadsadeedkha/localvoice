@@ -3,6 +3,8 @@ import { AppController } from './app.controller';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { validateEnv } from './config/env';
+import { TenantsModule } from './tenants/tenant.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -16,10 +18,13 @@ import { validateEnv } from './config/env';
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
+        uuidExtension: 'pgcrypto',
         autoLoadEntities: true,
         synchronize: false,
       }),
     }),
+    TenantsModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
 })
