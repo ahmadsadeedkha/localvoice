@@ -11,6 +11,11 @@ const schema = z.object({
   RETELL_API_KEY: z.string().optional(),
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),
+  CLERK_PUBLISHABLE_KEY: z.string().min(1),
+  CLERK_SECRET_KEY: z.string().min(1),
+  ALLOWED_ORIGINS: z
+    .string()
+    .default('http://localhost:3000,http://localhost:5173'),
 });
 
 export const validateEnv = (config: Record<string, unknown>) =>

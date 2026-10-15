@@ -41,7 +41,7 @@ jobs:
       PUBLIC_BASE_URL: https://example.com
       # Add these when the Clerk variables become required in env.ts.
       # Dummy values only; real secrets belong in GitHub Secrets.
-      CLERK_PUBLISHABLE_KEY: pk_test_dummy
+      CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
       CLERK_SECRET_KEY: sk_test_dummy
     steps:
       - uses: actions/checkout@v4
@@ -66,10 +66,10 @@ jobs:
       run:
         working-directory: ${{ matrix.app }}
     # env:
-      # Publishable keys are public by design. Create a repository variable
-      # named CLERK_PUBLISHABLE_KEY once you have your dev instance key.
-      # NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
-      # VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+    # Publishable keys are public by design. Create a repository variable
+    # named CLERK_PUBLISHABLE_KEY once you have your dev instance key.
+    # NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
+    # VITE_CLERK_PUBLISHABLE_KEY: ${{ vars.CLERK_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
