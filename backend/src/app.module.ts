@@ -5,6 +5,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { validateEnv } from './config/env';
 import { TenantsModule } from './tenants/tenant.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     }),
     TenantsModule,
     WebhooksModule,
+    AuthModule,
   ],
   controllers: [AppController],
 })
