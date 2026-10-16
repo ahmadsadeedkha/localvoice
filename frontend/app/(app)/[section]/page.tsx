@@ -53,6 +53,10 @@ const sections: Record<
   },
 };
 
+export function generateStaticParams() {
+  return Object.keys(sections).map((section) => ({ section }));
+}
+
 export default async function SectionPage({
   params,
 }: {

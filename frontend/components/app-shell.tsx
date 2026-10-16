@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Menu, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -32,6 +33,16 @@ function Brand() {
       </span>
       LocalVoice AI
     </Link>
+  );
+}
+
+function NavFallback() {
+  return (
+    <div className="flex flex-col gap-1 p-3" aria-hidden>
+      {navItems.map((item) => (
+        <Skeleton key={item.href} className="h-9 w-full" />
+      ))}
+    </div>
   );
 }
 
@@ -73,7 +84,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-14 items-center border-b px-4">
           <Brand />
         </div>
-        <SidebarNav />
+        <Suspense fallback={<NavFallback />}>
+          <SidebarNav />
+        </Suspense>
       </aside>
 
       <div className="md:pl-60">
@@ -94,7 +107,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <div className="flex h-14 items-center border-b px-4">
                 <Brand />
               </div>
-              <SidebarNav onNavigate={() => setOpen(false)} />
+              <Suspense fallback={<NavFallback />}>
+                <SidebarNav onNavigate={() => setOpen(false)} />
+              </Suspense>
             </SheetContent>
           </Sheet>
 
