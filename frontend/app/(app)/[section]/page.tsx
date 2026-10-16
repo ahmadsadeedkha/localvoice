@@ -1,0 +1,75 @@
+import { notFound } from "next/navigation";
+import {
+  Bot,
+  CalendarDays,
+  Phone,
+  Plug,
+  Settings,
+  Users,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
+import { PageHeader } from "@/components/page-header";
+import { EmptyState } from "@/components/empty-state";
+
+const sections: Record<
+  string,
+  { title: string; description: string; icon: LucideIcon }
+> = {
+  calls: {
+    title: "Calls",
+    description: "Every call your agent answered.",
+    icon: Phone,
+  },
+  appointments: {
+    title: "Appointments",
+    description: "Bookings made by your agent.",
+    icon: CalendarDays,
+  },
+  customers: {
+    title: "Customers",
+    description: "People who have called you.",
+    icon: Users,
+  },
+  services: {
+    title: "Services & hours",
+    description: "What you offer and when you're open.",
+    icon: Settings,
+  },
+  agent: {
+    title: "AI agent",
+    description: "Greeting, FAQs and behavior.",
+    icon: Bot,
+  },
+  integrations: {
+    title: "Integrations",
+    description: "Connect your calendar and tools.",
+    icon: Plug,
+  },
+  team: {
+    title: "Team",
+    description: "Who can access this business.",
+    icon: UsersRound,
+  },
+};
+
+export default async function SectionPage({
+  params,
+}: {
+  params: Promise<{ section: string }>;
+}) {
+  const { section } = await params;
+  const meta = sections[section];
+  if (!meta) notFound();
+
+  return (
+    <>
+      <PageHeader title={meta.title} description={meta.description} />
+      <EmptyState
+        icon={meta.icon}
+        title="Nothing here yet"
+        description="This screen is coming soon."
+      />
+    </>
+  );
+}
