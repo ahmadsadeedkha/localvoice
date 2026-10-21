@@ -6,6 +6,7 @@ import { validateEnv } from './config/env';
 import { TenantsModule } from './tenants/tenant.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { AuthModule } from './auth/auth.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AuthModule } from './auth/auth.module';
     TenantsModule,
     WebhooksModule,
     AuthModule,
+    AdminModule,
   ],
   controllers: [AppController],
 })
