@@ -12,6 +12,7 @@ import { TenantStatus } from '../tenants/tenant.entity';
 import { MemberRole } from '../tenants/tenant-member.entity';
 import { AuthedRequest } from './auth.types';
 import { IS_PUBLIC_KEY } from './decorators';
+import { PLATFORM_ADMIN_KEY } from './decorators';
 
 function mapRole(orgRole?: string | null): MemberRole | null {
   switch (orgRole) {
@@ -45,6 +46,11 @@ export class AuthGuard implements CanActivate {
     const auth = getAuth(req);
     if (!auth.userId) throw new UnauthorizedException();
 
+    const platformRoute = this.reflector.getAllAndOverride<boolean>(
+      PLATFORM_ADMIN_KEY,
+      [ctx.getHandler(), ctx.getClass()],
+    );
+
     // The tenant always comes from the verified token, never from the request body or URL
     let tenantId: string | null = null;
     if (auth.orgId) {
@@ -52,7 +58,7 @@ export class AuthGuard implements CanActivate {
         auth.orgId,
         auth.orgSlug,
       );
-      if (tenant.status === TenantStatus.Suspended) {
+      if (tenant.status === TenantStatus.Suspended && !platformRoute) {
         throw new ForbiddenException('Tenant suspended');
       }
       tenantId = tenant.id;

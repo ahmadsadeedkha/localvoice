@@ -38,4 +38,15 @@ export class TenantsService {
 
     return this.repo.findOneByOrFail({ clerkOrgId: orgId });
   }
+
+  findAllPaged(take: number, skip: number): Promise<[Tenant[], number]> {
+    return this.repo.findAndCount({ order: { createdAt: 'DESC' }, take, skip });
+  }
+
+  async setStatus(id: string, status: TenantStatus): Promise<Tenant | null> {
+    const tenant = await this.repo.findOne({ where: { id } });
+    if (!tenant) return null;
+    tenant.status = status;
+    return this.repo.save(tenant);
+  }
 }
