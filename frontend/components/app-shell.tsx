@@ -6,21 +6,13 @@ import { useState, Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Menu, PhoneCall } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import {
   Sheet,
   SheetContent,
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { navItems } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -113,29 +105,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </SheetContent>
           </Sheet>
 
+          <OrganizationSwitcher
+            hidePersonal
+            afterSelectOrganizationUrl="/dashboard"
+            afterCreateOrganizationUrl="/dashboard"
+          />
+
           <div className="ml-auto flex items-center gap-2">
             <ThemeToggle />
-            {/* Placeholder: replaced by Clerk's UserButton when auth is wired in */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="rounded-full"
-                  aria-label="Account menu"
-                >
-                  <Avatar className="size-8">
-                    <AvatarFallback>LV</AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>My account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem>Sign out</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <UserButton />
           </div>
         </header>
 
