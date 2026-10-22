@@ -9,24 +9,11 @@ import { Reflector } from '@nestjs/core';
 import { getAuth } from '@clerk/express';
 import { TenantsService } from '../tenants/tenants.service';
 import { TenantStatus } from '../tenants/tenant.entity';
-import { MemberRole } from '../tenants/tenant-member.entity';
+import { mapOrgRole } from './org-role';
 import { AuthedRequest } from './auth.types';
 import { IS_PUBLIC_KEY } from './decorators';
 import { PLATFORM_ADMIN_KEY } from './decorators';
 
-function mapRole(orgRole?: string | null): MemberRole | null {
-  switch (orgRole) {
-    case 'org:owner':
-      return MemberRole.Owner;
-    case 'org:admin':
-      return MemberRole.Admin;
-    case 'org:staff':
-    case 'org:member':
-      return MemberRole.Staff;
-    default:
-      return null;
-  }
-}
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -71,7 +58,7 @@ export class AuthGuard implements CanActivate {
       userId: auth.userId,
       orgId: auth.orgId ?? null,
       tenantId,
-      role: mapRole(auth.orgRole),
+      role: mapOrgRole(auth.orgRole),
       isPlatformAdmin: metadata?.role === 'platform_admin',
     };
     return true;
