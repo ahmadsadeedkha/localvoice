@@ -11,11 +11,13 @@ import { CurrentCall } from '../calls/call-context.decorator';
 import { type CallContext } from '../calls/call-context.types';
 import { BookInput, BookingService } from '../booking/booking.service';
 import { ToolsService } from './tools.service';
+import { Public } from '../auth/decorators';
 
 /**
  * Retell custom-function endpoints. Tenant comes ONLY from the guard
  * (verified signature + call id -> calls table), never from the body.
  */
+@Public()
 @Controller('tools')
 @UseGuards(CallContextGuard)
 export class ToolsController {
