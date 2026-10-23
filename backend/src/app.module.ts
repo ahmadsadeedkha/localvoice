@@ -22,6 +22,10 @@ import { ToolsModule } from './tools/tools.module';
       useFactory: (config: ConfigService) => ({
         type: 'postgres',
         url: config.get<string>('DATABASE_URL'),
+        ssl:
+          config.get<string>('DB_SSL') === 'true'
+            ? { rejectUnauthorized: false }
+            : false,
         uuidExtension: 'pgcrypto',
         autoLoadEntities: true,
         synchronize: false,
