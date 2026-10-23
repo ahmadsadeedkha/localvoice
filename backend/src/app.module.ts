@@ -7,6 +7,7 @@ import { TenantsModule } from './tenants/tenant.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
+import { CallsModule } from './calls/calls.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { AdminModule } from './admin/admin.module';
     WebhooksModule,
     AuthModule,
     AdminModule,
+    CallsModule,
   ],
   controllers: [AppController],
 })

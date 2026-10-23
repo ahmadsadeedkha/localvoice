@@ -44,6 +44,9 @@ importers:
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
+      retell-sdk:
+        specifier: ^6.2.9
+        version: 6.2.9
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2
@@ -2770,6 +2773,9 @@ packages:
   restore-cursor@5.1.0:
     resolution: {integrity: sha512-oMA2dcrw6u0YfxJQXm342bFKX/E4sG9rbTzO9ptUcR/e8A33cHuvStiYOwH7fszkZlZ1z/ta9AAoPk2F4qIOHA==}
     engines: {node: '>=18'}
+
+  retell-sdk@6.2.9:
+    resolution: {integrity: sha512-c08S5Xkc0OA5iPbcTAIcPAmQJVunqMKRI0IGcNlNHlOZ45R/SLRK7/apkUOs1hZaSIDhyS1Ku85rdDkHOcCZ9g==}
 
   router@2.2.0:
     resolution: {integrity: sha512-nLTrUKm2UyiL7rlhapu/Zl45FwNgkZGaCpZbIHajDYgwlJCOzLSk+cIPAnsEqV955GjILJnKbdQC1nVPz+gAYQ==}
@@ -6054,6 +6060,8 @@ snapshots:
     dependencies:
       onetime: 7.0.0
       signal-exit: 4.1.0
+
+  retell-sdk@6.2.9: {}
 
   router@2.2.0(supports-color@8.1.1):
     dependencies:

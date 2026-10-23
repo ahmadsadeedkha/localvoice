@@ -37,6 +37,7 @@
     "ioredis": "^6.0.0",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
+    "retell-sdk": "^6.2.9",
     "rxjs": "^7.8.1",
     "svix": "^2.8.0",
     "typeorm": "^1.1.2",
