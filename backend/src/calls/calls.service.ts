@@ -40,11 +40,18 @@ export class CallsService {
       }),
     );
 
-    return { accessToken: res.access_token, callId: res.call_id };
+    return {
+      callId: res.call_id,
+      accessToken: res.access_token,
+      transport: res.transport,
+      iceServers: res.ice_servers,
+    };
   }
 
   /** Retell requires every dynamic variable value to be a string. */
-  private async buildDynamicVariables(tenantId: string): Promise<Record<string, string>> {
+  private async buildDynamicVariables(
+    tenantId: string,
+  ): Promise<Record<string, string>> {
     const rows = await this.ds.query(
       `SELECT name, timezone FROM tenants WHERE id = $1`,
       [tenantId],
