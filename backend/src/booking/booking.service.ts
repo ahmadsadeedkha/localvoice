@@ -8,7 +8,7 @@ import { Call } from '../database/entities/call.entity';
 import { Service } from '../database/entities/service.entity';
 import {
   AVAILABILITY_PROVIDER,
-  AvailabilityProvider,
+  type AvailabilityProvider,
 } from '../availability/availability.provider';
 import { CallContext } from '../calls/call-context.types';
 
