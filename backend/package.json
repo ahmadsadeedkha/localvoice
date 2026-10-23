@@ -22,7 +22,8 @@
     "typeorm": "typeorm-ts-node-commonjs -d src/database/data-source.ts",
     "migration:generate": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:generate",
     "migration:run": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:run",
-    "migration:revert": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:revert"
+    "migration:revert": "typeorm-ts-node-commonjs -d src/database/data-source.ts migration:revert",
+    "seed": "ts-node src/database/seed.ts"
   },
   "dependencies": {
     "@clerk/express": "^2.1.78",
@@ -35,6 +36,7 @@
     "bullmq": "^6.3.12",
     "dotenv": "^18.0.7",
     "ioredis": "^6.0.0",
+    "luxon": "^3.7.2",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "retell-sdk": "^6.2.9",
@@ -50,6 +52,7 @@
     "@nestjs/testing": "^12.0.1",
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
+    "@types/luxon": "^3.7.6",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.0.0",

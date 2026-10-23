@@ -8,6 +8,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { CallsModule } from './calls/calls.module';
+import { ToolsModule } from './tools/tools.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CallsModule } from './calls/calls.module';
     AuthModule,
     AdminModule,
     CallsModule,
+    ToolsModule,
   ],
   controllers: [AppController],
 })
