@@ -39,10 +39,23 @@ export class RetellWebhookController {
     try {
       payload = JSON.parse(raw);
     } catch {
+      this.logger.warn('Retell payload is not valid JSON');
       throw new BadRequestException();
     }
 
+    const callId = payload.call?.call_id;
+    this.logger.log(`Retell verified: ${payload.event} call=${callId}`);
+
     // Persist/enqueue only, then return fast. Heavy work goes to BullMQ.
-    await this.service.ingest(payload.event, payload.call);
+    try {
+      await this.service.ingest(payload.event, payload.call);
+      this.logger.log(`Retell ingested: ${payload.event} call=${callId}`);
+    } catch (err) {
+      this.logger.error(
+        `Retell ingest failed: ${payload.event} call=${callId}: ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      throw err;
+    }
   }
 }
