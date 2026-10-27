@@ -1,15 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { mapOrgRole } from '../auth/org-role';
-import { MemberRole, TenantMember } from '../tenants/tenant-member.entity';
-import { Tenant, TenantStatus } from '../tenants/tenant.entity';
-import { TenantsService } from '../tenants/tenants.service';
+import { mapOrgRole } from '../../auth/org-role';
+import { MemberRole, TenantMember } from '../../tenants/tenant-member.entity';
+import { Tenant, TenantStatus } from '../../tenants/tenant.entity';
+import { TenantsService } from '../../tenants/tenants.service';
 import {
   WebhookEvent,
   WebhookEventStatus,
   WebhookProvider,
-} from './webhook-event.entity';
+} from '../webhook-event.entity';
 
 export interface ClerkEvent {
   type: string;

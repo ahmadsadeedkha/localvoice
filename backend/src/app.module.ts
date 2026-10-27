@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { AdminModule } from './admin/admin.module';
 import { CallsModule } from './calls/calls.module';
 import { ToolsModule } from './tools/tools.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { ToolsModule } from './tools/tools.module';
     AdminModule,
     CallsModule,
     ToolsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
 })
