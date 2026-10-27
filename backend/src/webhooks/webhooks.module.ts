@@ -6,9 +6,11 @@ import { ClerkWebhookService } from './clerk-webhook.service';
 import { ClerkWebhookController } from './clerk-webhook.controller';
 import { RetellWebhookController } from './retell/retell-webhook.controller';
 import { RetellWebhookService } from './retell/retell-webhook.service';
+import { Call } from '../database/entities/call.entity';
+import { Tenant } from '../tenants/tenant.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([WebhookEvent]), TenantsModule],
+  imports: [TypeOrmModule.forFeature([WebhookEvent, Call, Tenant]), TenantsModule],
   controllers: [ClerkWebhookController, RetellWebhookController],
   providers: [ClerkWebhookService, RetellWebhookService],
   exports: [TypeOrmModule],
