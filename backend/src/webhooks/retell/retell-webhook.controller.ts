@@ -12,12 +12,14 @@ import type { RawBodyRequest } from '@nestjs/common';
 import type { Request } from 'express';
 import { verifyRetellSignature } from './retell-signature';
 import { RetellWebhookService } from './retell-webhook.service';
+import { Public } from '../../auth/decorators';
 
 @Controller('webhooks/retell')
 export class RetellWebhookController {
   private readonly logger = new Logger(RetellWebhookController.name);
   constructor(private readonly service: RetellWebhookService) {}
 
+  @Public()
   @Post()
   @HttpCode(204)
   async handle(
