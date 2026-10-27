@@ -26,6 +26,9 @@ export class RetellWebhookController {
     @Req() req: RawBodyRequest<Request>,
     @Headers('x-retell-signature') signature?: string,
   ) {
+    this.logger.log(
+      `Retell hit: sig=${signature ? 'yes' : 'no'}, rawBody=${req.rawBody ? req.rawBody.length : 'MISSING'}`,
+    );
     const raw = req.rawBody?.toString('utf8') ?? '';
     if (!verifyRetellSignature(raw, process.env.RETELL_API_KEY!, signature)) {
       this.logger.warn('Invalid Retell signature');
