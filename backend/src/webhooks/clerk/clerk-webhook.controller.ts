@@ -11,7 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { type Request } from 'express';
 import { Webhook } from 'svix';
-import { Public } from '../auth/decorators';
+import { Public } from '../../auth/decorators';
 import { ClerkEvent, ClerkWebhookService } from './clerk-webhook.service';
 
 @Controller('webhooks/clerk')

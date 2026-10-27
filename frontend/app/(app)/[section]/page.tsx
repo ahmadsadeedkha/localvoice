@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import {
   Bot,
   CalendarDays,
-  Phone,
   Plug,
   Settings,
   Users,
@@ -16,11 +15,6 @@ const sections: Record<
   string,
   { title: string; description: string; icon: LucideIcon }
 > = {
-  calls: {
-    title: "Calls",
-    description: "Every call your agent answered.",
-    icon: Phone,
-  },
   appointments: {
     title: "Appointments",
     description: "Bookings made by your agent.",

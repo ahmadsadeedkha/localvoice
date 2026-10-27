@@ -1,6 +1,16 @@
 import "server-only";
 import { auth } from "@clerk/nextjs/server";
 
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    path: string,
+  ) {
+    super(`API ${status} on ${path}`);
+    this.name = "ApiError";
+  }
+}
+
 export async function apiFetch<T>(path: string): Promise<T> {
   const { getToken } = await auth();
   const token = await getToken();
