@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddRetellFieldsToCalls1790000000000 implements MigrationInterface {
-  name = 'AddRetellFieldsToCalls1790000000000';
+export class AddRetellFieldsToCalls1793100000000 implements MigrationInterface {
+  name = 'AddRetellFieldsToCalls1793100000000';
 
   public async up(q: QueryRunner): Promise<void> {
     await q.query(`
