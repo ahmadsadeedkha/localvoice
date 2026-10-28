@@ -1,18 +1,20 @@
 import { Suspense } from "react";
-import { Settings } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DataTable, type Column } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
+import { HoursEditor } from "@/components/services/hours-editor";
+import { ServiceDialog } from "@/components/services/service-dialog";
+import { ServiceRowActions } from "@/components/services/service-row-actions";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api";
 import { DAY_NAMES, WEEK_ORDER, intervalsByDay } from "@/lib/hours";
-import type { ServicesResponse } from "@/lib/business-types";
+import type { Service, ServicesResponse } from "@/lib/business-types";
 
-type Service = ServicesResponse["services"][number];
-
-const columns: Column<Service>[] = [
+const baseColumns: Column<Service>[] = [
   {
     key: "name",
     header: "Service",
@@ -53,58 +55,94 @@ const columns: Column<Service>[] = [
   },
 ];
 
+const actionsColumn: Column<Service> = {
+  key: "actions",
+  header: "Actions",
+  cell: (s) => <ServiceRowActions service={s} />,
+  className: "text-right",
+};
+
+function ReadOnlyHours({ data }: { data: ServicesResponse }) {
+  const byDay = intervalsByDay(data.hours);
+  return (
+    <Card>
+      <CardContent>
+        <dl className="divide-y">
+          {WEEK_ORDER.map((day) => {
+            const intervals = byDay.get(day) ?? [];
+            return (
+              <div
+                key={day}
+                className="flex items-center justify-between py-2.5 text-sm"
+              >
+                <dt className="font-medium">{DAY_NAMES[day]}</dt>
+                <dd
+                  className={
+                    intervals.length ? "tabular-nums" : "text-muted-foreground"
+                  }
+                >
+                  {intervals.length ? intervals.join(", ") : "Closed"}
+                </dd>
+              </div>
+            );
+          })}
+        </dl>
+      </CardContent>
+    </Card>
+  );
+}
+
 async function ServicesData() {
   const data = await apiFetch<ServicesResponse>("/services");
-  const byDay = intervalsByDay(data.hours);
 
   return (
     <>
-      <h2 className="mb-3 text-lg font-semibold">Services</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold">Services</h2>
+        {data.canEdit && (
+          <ServiceDialog
+            trigger={
+              <Button size="sm">
+                <Plus aria-hidden /> Add service
+              </Button>
+            }
+          />
+        )}
+      </div>
       <DataTable
-        columns={columns}
+        columns={data.canEdit ? [...baseColumns, actionsColumn] : baseColumns}
         rows={data.services}
         getRowId={(s) => s.id}
         empty={
           <EmptyState
             icon={Settings}
             title="No services yet"
-            description="Services your agent can book will appear here."
+            description={
+              data.canEdit
+                ? "Add a service so your agent can book it."
+                : "Services your agent can book will appear here."
+            }
           />
         }
       />
 
-      <div className="mb-3 mt-8 flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold">Opening hours</h2>
-        <p className="text-sm text-muted-foreground">
-          Times in {data.timezone.replaceAll("_", " ")}
-        </p>
-      </div>
-      <Card>
-        <CardContent>
-          <dl className="divide-y">
-            {WEEK_ORDER.map((day) => {
-              const intervals = byDay.get(day) ?? [];
-              return (
-                <div
-                  key={day}
-                  className="flex items-center justify-between py-2.5 text-sm"
-                >
-                  <dt className="font-medium">{DAY_NAMES[day]}</dt>
-                  <dd
-                    className={
-                      intervals.length
-                        ? "tabular-nums"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    {intervals.length ? intervals.join(", ") : "Closed"}
-                  </dd>
-                </div>
-              );
-            })}
-          </dl>
-        </CardContent>
-      </Card>
+      <h2 className="mb-3 mt-8 text-lg font-semibold">Opening hours</h2>
+      {data.canEdit ? (
+        <HoursEditor initialHours={data.hours} timezone={data.timezone} />
+      ) : (
+        <>
+          <ReadOnlyHours data={data} />
+          <p className="mt-3 text-sm text-muted-foreground">
+            Times are in {data.timezone.replaceAll("_", " ")}.
+          </p>
+        </>
+      )}
+
+      <p className="mt-6 text-sm text-muted-foreground">
+        {data.canEdit
+          ? "Changes apply to new bookings. Existing appointments aren’t affected."
+          : "Only owners and admins can edit services and hours."}
+      </p>
     </>
   );
 }

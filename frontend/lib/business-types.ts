@@ -21,14 +21,24 @@ export type AppointmentsResponse = {
   items: AppointmentItem[];
 };
 
+export type Service = {
+  id: string;
+  name: string;
+  description: string | null;
+  durationMinutes: number;
+  active: boolean;
+};
+
+export type HourInterval = {
+  dayOfWeek: number;
+  openTime: string;
+  closeTime: string;
+};
+
 export type ServicesResponse = {
   timezone: string;
-  services: {
-    id: string;
-    name: string;
-    description: string | null;
-    durationMinutes: number;
-    active: boolean;
-  }[];
-  hours: { dayOfWeek: number; openTime: string; closeTime: string }[];
+  /** True for owners and admins; the backend enforces this on every write. */
+  canEdit: boolean;
+  services: Service[];
+  hours: HourInterval[];
 };
