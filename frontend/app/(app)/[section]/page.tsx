@@ -1,9 +1,7 @@
 import { notFound } from "next/navigation";
 import {
   Bot,
-  CalendarDays,
   Plug,
-  Settings,
   Users,
   UsersRound,
   type LucideIcon,
@@ -14,21 +12,11 @@ import { EmptyState } from "@/components/empty-state";
 const sections: Record<
   string,
   { title: string; description: string; icon: LucideIcon }
-> = {
-  appointments: {
-    title: "Appointments",
-    description: "Bookings made by your agent.",
-    icon: CalendarDays,
-  },
+> = {  
   customers: {
     title: "Customers",
     description: "People who have called you.",
     icon: Users,
-  },
-  services: {
-    title: "Services & hours",
-    description: "What you offer and when you're open.",
-    icon: Settings,
   },
   agent: {
     title: "AI agent",
