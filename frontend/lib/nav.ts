@@ -1,12 +1,12 @@
 import {
-  Bot,
+  // Bot,
   CalendarDays,
   LayoutDashboard,
   Phone,
   Plug,
   Settings,
   Users,
-  UsersRound,
+  // UsersRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,7 +18,7 @@ export const navItems: NavItem[] = [
   { href: "/appointments", label: "Appointments", icon: CalendarDays },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/services", label: "Services & hours", icon: Settings },
-  { href: "/agent", label: "AI agent", icon: Bot },
+  //{ href: "/agent", label: "AI agent", icon: Bot },
   { href: "/integrations", label: "Integrations", icon: Plug },
-  { href: "/team", label: "Team", icon: UsersRound },
+  //{ href: "/team", label: "Team", icon: UsersRound },
 ];
