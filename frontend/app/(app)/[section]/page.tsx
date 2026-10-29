@@ -1,23 +1,12 @@
 import { notFound } from "next/navigation";
-import {
-  Bot,
-  Plug,
-  Users,
-  UsersRound,
-  type LucideIcon,
-} from "lucide-react";
+import { Bot, Plug, UsersRound, type LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 
 const sections: Record<
   string,
   { title: string; description: string; icon: LucideIcon }
-> = {  
-  customers: {
-    title: "Customers",
-    description: "People who have called you.",
-    icon: Users,
-  },
+> = {
   agent: {
     title: "AI agent",
     description: "Greeting, FAQs and behavior.",

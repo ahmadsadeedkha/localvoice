@@ -11,6 +11,7 @@ import { CallsModule } from './calls/calls.module';
 import { ToolsModule } from './tools/tools.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { BusinessModule } from './business/business.module';
+import { CustomersModule } from './customers/customers.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { BusinessModule } from './business/business.module';
     ToolsModule,
     DashboardModule,
     BusinessModule,
+    CustomersModule,
   ],
   controllers: [AppController],
 })
