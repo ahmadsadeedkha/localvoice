@@ -11,6 +11,11 @@ import { CurrentCall } from '../calls/call-context.decorator';
 import { type CallContext } from '../calls/call-context.types';
 import { BookInput, BookingService } from '../booking/booking.service';
 import { ToolsService } from './tools.service';
+import { MessagesService } from '../messages/messages.service';
+import {
+  type TakeMessageInput,
+  type TransferInput,
+} from '../messages/messages.validation';
 import { Public } from '../auth/decorators';
 
 /**
@@ -26,6 +31,7 @@ export class ToolsController {
   constructor(
     private readonly tools: ToolsService,
     private readonly booking: BookingService,
+    private readonly messages: MessagesService,
   ) {}
 
   @Post('get-business-info')
@@ -58,5 +64,26 @@ export class ToolsController {
       `book_appointment call=${call.retellCallId} service=${body?.args?.service_id} start=${body?.args?.start}`,
     );
     return this.booking.bookAppointment(call, body?.args ?? {});
+  }
+
+  @Post('take-message')
+  @HttpCode(200)
+  takeMessage(
+    @CurrentCall() call: CallContext,
+    @Body() body: { args?: TakeMessageInput },
+  ) {
+    // Not logging args: they contain the caller's name, number and message.
+    this.log.log(`take_message call=${call.retellCallId}`);
+    return this.messages.takeMessage(call, body?.args ?? {});
+  }
+
+  @Post('transfer-to-human')
+  @HttpCode(200)
+  transferToHuman(
+    @CurrentCall() call: CallContext,
+    @Body() body: { args?: TransferInput },
+  ) {
+    this.log.log(`transfer_to_human call=${call.retellCallId}`);
+    return this.messages.transferToHuman(call, body?.args ?? {});
   }
 }

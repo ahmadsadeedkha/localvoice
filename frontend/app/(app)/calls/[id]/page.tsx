@@ -68,7 +68,12 @@ async function CallData({ params }: Pick<PageProps<"/calls/[id]">, "params">) {
         <CardContent className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
           <Fact label="Caller">
             {call.fromNumber ? (
-              <PhoneNumber value={call.fromNumber} />
+              <Link
+                href={`/customers/${encodeURIComponent(call.fromNumber)}`}
+                className="underline-offset-4 hover:underline"
+              >
+                <PhoneNumber value={call.fromNumber} />
+              </Link>
             ) : call.source === "web_test" ? (
               "Web test call"
             ) : (
