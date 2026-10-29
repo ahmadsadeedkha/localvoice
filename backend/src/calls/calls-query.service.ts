@@ -70,12 +70,12 @@ export interface CallDetail extends CallListItem {
   }[];
 }
 
-const LIST_COLUMNS = `
+export const LIST_COLUMNS = `
   c.id, c.source, c.from_number, c.to_number, c.status, c.started_at,
   c.duration_ms, c.sentiment, c.summary,
   ${OUTCOME_SQL} AS outcome`;
 
-const toListItem = (r: any): CallListItem => ({
+export const toListItem = (r: any): CallListItem => ({
   id: r.id,
   source: r.source,
   fromNumber: r.from_number,
