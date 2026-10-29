@@ -6,6 +6,7 @@ import {
   Plug,
   Settings,
   Users,
+  MessageSquare,
   // UsersRound,
   type LucideIcon,
 } from "lucide-react";
@@ -15,6 +16,7 @@ export type NavItem = { href: string; label: string; icon: LucideIcon };
 export const navItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/calls", label: "Calls", icon: Phone },
+  { href: "/messages", label: "Messages", icon: MessageSquare },
   { href: "/appointments", label: "Appointments", icon: CalendarDays },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/services", label: "Services & hours", icon: Settings },

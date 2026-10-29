@@ -12,6 +12,8 @@ import { ToolsModule } from './tools/tools.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { BusinessModule } from './business/business.module';
 import { CustomersModule } from './customers/customers.module';
+import { MessagesModule } from './messages/messages.module';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { CustomersModule } from './customers/customers.module';
     DashboardModule,
     BusinessModule,
     CustomersModule,
+    MessagesModule,
+    QueueModule,
   ],
   controllers: [AppController],
 })

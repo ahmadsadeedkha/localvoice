@@ -7,6 +7,7 @@ import { Service } from '../database/entities/service.entity';
 import { ToolsController } from './tools.controller';
 import { ToolsService } from './tools.service';
 import { BookingModule } from '../booking/booking.module';
+import { MessagesModule } from '../messages/messages.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { BookingModule } from '../booking/booking.module';
     AvailabilityModule,
     BookingModule,
     CallsModule,
+    MessagesModule,
   ],
   controllers: [ToolsController],
   providers: [ToolsService],
