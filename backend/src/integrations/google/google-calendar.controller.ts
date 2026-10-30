@@ -8,6 +8,7 @@ import {
   Put,
   Query,
   Res,
+  ConflictException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { type Response } from 'express';
@@ -16,7 +17,24 @@ import { type Principal } from '../../auth/auth.types';
 import { CurrentPrincipal, Public, Roles } from '../../auth/decorators';
 import { requireTenant } from '../../auth/require-tenant';
 import { MemberRole } from '../../tenants/tenant-member.entity';
-import { GoogleCalendarService } from './google-calendar.service';
+import {
+  GoogleCalendarService,
+  GoogleNotConnectedError,
+} from './google-calendar.service';
+
+const canEdit = (p: Principal) =>
+  p.role === MemberRole.Owner || p.role === MemberRole.Admin;
+
+/** Google access died mid-request: tell the dashboard to show "Reconnect" (409), not a 500. */
+async function orReconnect<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof GoogleNotConnectedError)
+      throw new ConflictException('needs_reconnect');
+    throw e;
+  }
+}
 
 const selectCalendarSchema = z.object({
   calendarId: z.string().trim().min(1).max(255),
@@ -32,8 +50,9 @@ export class GoogleCalendarController {
   ) {}
 
   @Get()
-  status(@CurrentPrincipal() p: Principal) {
-    return this.google.status(requireTenant(p));
+  async status(@CurrentPrincipal() p: Principal) {
+    const status = await this.google.status(requireTenant(p));
+    return { ...status, canEdit: canEdit(p) };
   }
 
   /**
@@ -57,7 +76,7 @@ export class GoogleCalendarController {
     @Query('error') error?: string,
   ) {
     const back = new URL(
-      '/settings',
+      '/integrations',
       this.config.getOrThrow<string>('FRONTEND_URL'),
     );
     try {
@@ -79,7 +98,7 @@ export class GoogleCalendarController {
   @Get('calendars')
   @Roles(MemberRole.Owner, MemberRole.Admin)
   calendars(@CurrentPrincipal() p: Principal) {
-    return this.google.listCalendars(requireTenant(p));
+    return orReconnect(() => this.google.listCalendars(requireTenant(p)));
   }
 
   @Put('calendar')
@@ -88,7 +107,9 @@ export class GoogleCalendarController {
     const parsed = selectCalendarSchema.safeParse(body);
     if (!parsed.success)
       throw new BadRequestException('calendarId is required');
-    return this.google.selectCalendar(requireTenant(p), parsed.data.calendarId);
+    return orReconnect(() =>
+      this.google.selectCalendar(requireTenant(p), parsed.data.calendarId),
+    );
   }
 
   @Delete()

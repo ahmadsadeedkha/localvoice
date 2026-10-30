@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { Bot, Plug, UsersRound, type LucideIcon } from "lucide-react";
+import { Bot, UsersRound, type LucideIcon } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 
@@ -11,11 +11,6 @@ const sections: Record<
     title: "AI agent",
     description: "Greeting, FAQs and behavior.",
     icon: Bot,
-  },
-  integrations: {
-    title: "Integrations",
-    description: "Connect your calendar and tools.",
-    icon: Plug,
   },
   team: {
     title: "Team",
