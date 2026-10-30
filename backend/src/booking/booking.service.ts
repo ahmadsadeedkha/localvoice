@@ -8,6 +8,9 @@ import { Call } from '../database/entities/call.entity';
 import { Service } from '../database/entities/service.entity';
 import {
   AVAILABILITY_PROVIDER,
+  CALENDAR_UNAVAILABLE_RESULT,
+  CalendarUnavailableError,
+  TimeSlot,
   type AvailabilityProvider,
 } from '../availability/availability.provider';
 import { CallContext } from '../calls/call-context.types';
@@ -81,13 +84,21 @@ export class BookingService {
 
     // The requested start must be a genuinely free slot right now.
     const local = startDt.setZone(tz);
-    const free = await this.availability.getFreeSlots({
-      tenantId,
-      timezone: tz,
-      durationMinutes: service.durationMinutes,
-      from: local.startOf('day').toJSDate(),
-      to: local.endOf('day').toJSDate(),
-    });
+    // With Google connected, this re-checks the real calendar right before booking.
+    let free: TimeSlot[];
+    try {
+      free = await this.availability.getFreeSlots({
+        tenantId,
+        timezone: tz,
+        durationMinutes: service.durationMinutes,
+        from: local.startOf('day').toJSDate(),
+        to: local.endOf('day').toJSDate(),
+      });
+    } catch (e) {
+      // Never claim a booking we couldn't verify against the calendar.
+      if (e instanceof CalendarUnavailableError) return CALENDAR_UNAVAILABLE_RESULT;
+      throw e;
+    }
     const slot = free.find((s) => s.start.getTime() === startDt.toMillis());
     if (!slot) {
       return {

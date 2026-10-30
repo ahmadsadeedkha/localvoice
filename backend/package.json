@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@clerk/express": "^2.1.78",
+    "@googleapis/calendar": "^20.1.0",
     "@nestjs/bullmq": "^12.0.0",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.1",
@@ -36,6 +37,7 @@
     "@nestjs/typeorm": "^12.0.2",
     "bullmq": "^6.3.12",
     "dotenv": "^18.0.7",
+    "google-auth-library": "^11.3.1",
     "ioredis": "^6.0.0",
     "luxon": "^3.7.2",
     "pg": "^8.23.1",
