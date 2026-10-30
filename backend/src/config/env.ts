@@ -15,6 +15,11 @@ const schema = z.object({
   CLERK_PUBLISHABLE_KEY: z.string().min(1),
   CLERK_SECRET_KEY: z.string().min(1),
   CLERK_WEBHOOK_SIGNING_SECRET: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REDIRECT_URI: z.url().optional(),
+  GOOGLE_TOKEN_ENC_KEY: z.string().optional(),
+  FRONTEND_URL: z.url().default('http://localhost:3000'),
   ALLOWED_ORIGINS: z
     .string()
     .default('http://localhost:3000,http://localhost:5173'),

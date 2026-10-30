@@ -7,6 +7,8 @@ import { Service } from '../database/entities/service.entity';
 import {
   AVAILABILITY_PROVIDER,
   type AvailabilityProvider,
+  CALENDAR_UNAVAILABLE_RESULT,
+  CalendarUnavailableError,
   TimeSlot,
 } from '../availability/availability.provider';
 
@@ -114,13 +116,20 @@ export class ToolsService {
     });
     if (!service) return { error: 'unknown_service', message: 'That service does not exist.' };
 
-    const all = await this.availability.getFreeSlots({
-      tenantId,
-      timezone: tz,
-      durationMinutes: service.durationMinutes,
-      from: requested.toJSDate(),
-      to: requested.plus({ days: SEARCH_DAYS }).endOf('day').toJSDate(),
-    });
+    let all: TimeSlot[];
+    try {
+      all = await this.availability.getFreeSlots({
+        tenantId,
+        timezone: tz,
+        durationMinutes: service.durationMinutes,
+        from: requested.toJSDate(),
+        to: requested.plus({ days: SEARCH_DAYS }).endOf('day').toJSDate(),
+      });
+    } catch (e) {
+      if (e instanceof CalendarUnavailableError)
+        return CALENDAR_UNAVAILABLE_RESULT;
+      throw e;
+    }
 
     // Callers don't care which resource: collapse to unique start times.
     const unique = new Map<number, TimeSlot>();

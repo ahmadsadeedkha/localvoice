@@ -14,6 +14,7 @@ import { BusinessModule } from './business/business.module';
 import { CustomersModule } from './customers/customers.module';
 import { MessagesModule } from './messages/messages.module';
 import { QueueModule } from './queue/queue.module';
+import { GoogleCalendarModule } from './integrations/google/google-calendar.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { QueueModule } from './queue/queue.module';
     CustomersModule,
     MessagesModule,
     QueueModule,
+    GoogleCalendarModule,
   ],
   controllers: [AppController],
 })
