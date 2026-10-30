@@ -1,9 +1,18 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, EntityManager } from 'typeorm';
 import { DateTime } from 'luxon';
 import { Booking } from '../database/entities/booking.entity';
-import { BOOKING_TRANSITIONS, BookingStatus } from '../database/entities/booking-status';
+import {
+  BOOKING_TRANSITIONS,
+  BookingStatus,
+} from '../database/entities/booking-status';
 import { Call } from '../database/entities/call.entity';
 import { Service } from '../database/entities/service.entity';
 import {
@@ -14,10 +23,20 @@ import {
   type AvailabilityProvider,
 } from '../availability/availability.provider';
 import { CallContext } from '../calls/call-context.types';
+import { InjectQueue } from '@nestjs/bullmq';
+import { type Queue } from 'bullmq';
+import {
+  CALENDAR_SYNC_QUEUE,
+  CREATE_EVENT_JOB,
+  CREATE_EVENT_JOB_OPTS,
+  createEventJobId,
+} from '../calendar-sync/calendar-sync.constants';
 
 const HOLD_TTL_MS = 5 * 60 * 1000;
 const MAX_BOOKINGS_PER_CALL = 3;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ENQUEUE_TIMEOUT_MS = 2000;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PHONE_RE = /^\+?[0-9]{7,15}$/;
 const EXCLUSION_VIOLATION = '23P01';
 const LABEL_FORMAT = "cccc, d LLLL 'at' h:mm a";
@@ -33,13 +52,18 @@ export interface BookInput {
 class TooManyBookingsError extends Error {}
 
 const isExclusionViolation = (e: any) =>
-  e?.driverError?.code === EXCLUSION_VIOLATION || e?.code === EXCLUSION_VIOLATION;
+  e?.driverError?.code === EXCLUSION_VIOLATION ||
+  e?.code === EXCLUSION_VIOLATION;
 
 @Injectable()
 export class BookingService {
+  private readonly log = new Logger(BookingService.name);
   constructor(
     @InjectDataSource() private readonly ds: DataSource,
-    @Inject(AVAILABILITY_PROVIDER) private readonly availability: AvailabilityProvider,
+    @Inject(AVAILABILITY_PROVIDER)
+    private readonly availability: AvailabilityProvider,
+    @InjectQueue(CALENDAR_SYNC_QUEUE)
+    private readonly calendarSync: Queue,
   ) {}
 
   /**
@@ -51,36 +75,57 @@ export class BookingService {
     const { tenantId } = call;
 
     if (!input.service_id || !UUID_RE.test(input.service_id)) {
-      return { error: 'invalid_service', message: 'Pick a service from get_business_info first.' };
+      return {
+        error: 'invalid_service',
+        message: 'Pick a service from get_business_info first.',
+      };
     }
 
     const startDt = DateTime.fromISO(input.start ?? '', { setZone: true });
     if (!startDt.isValid) {
-      return { error: 'invalid_start', message: 'Use the exact start value returned by check_availability.' };
+      return {
+        error: 'invalid_start',
+        message: 'Use the exact start value returned by check_availability.',
+      };
     }
 
     const name = (input.customer_name ?? '').trim();
     if (name.length < 2 || name.length > 200) {
-      return { error: 'missing_name', message: 'Ask the caller for their name.' };
+      return {
+        error: 'missing_name',
+        message: 'Ask the caller for their name.',
+      };
     }
 
-    const callRow = await this.ds.getRepository(Call).findOne({ where: { id: call.callId, tenantId } });
+    const callRow = await this.ds
+      .getRepository(Call)
+      .findOne({ where: { id: call.callId, tenantId } });
     let phone = (input.customer_phone ?? '').replace(/[\s\-()]/g, '');
     if (!phone && callRow?.fromNumber) phone = callRow.fromNumber;
     if (!PHONE_RE.test(phone)) {
-      return { error: 'missing_phone', message: 'Ask the caller for a phone number we can reach them on.' };
+      return {
+        error: 'missing_phone',
+        message: 'Ask the caller for a phone number we can reach them on.',
+      };
     }
 
     const notes = input.notes?.trim().slice(0, 500) || null;
 
-    const tenantRows = await this.ds.query(`SELECT timezone FROM tenants WHERE id = $1`, [tenantId]);
+    const tenantRows = await this.ds.query(
+      `SELECT timezone FROM tenants WHERE id = $1`,
+      [tenantId],
+    );
     if (!tenantRows.length) throw new Error('Tenant not found');
     const tz = String(tenantRows[0].timezone);
 
     const service = await this.ds
       .getRepository(Service)
       .findOne({ where: { id: input.service_id, tenantId, active: true } });
-    if (!service) return { error: 'unknown_service', message: 'That service does not exist.' };
+    if (!service)
+      return {
+        error: 'unknown_service',
+        message: 'That service does not exist.',
+      };
 
     // The requested start must be a genuinely free slot right now.
     const local = startDt.setZone(tz);
@@ -96,14 +141,16 @@ export class BookingService {
       });
     } catch (e) {
       // Never claim a booking we couldn't verify against the calendar.
-      if (e instanceof CalendarUnavailableError) return CALENDAR_UNAVAILABLE_RESULT;
+      if (e instanceof CalendarUnavailableError)
+        return CALENDAR_UNAVAILABLE_RESULT;
       throw e;
     }
     const slot = free.find((s) => s.start.getTime() === startDt.toMillis());
     if (!slot) {
       return {
         error: 'slot_unavailable',
-        message: 'That time is not available. Call check_availability again and offer other times.',
+        message:
+          'That time is not available. Call check_availability again and offer other times.',
       };
     }
 
@@ -121,7 +168,9 @@ export class BookingService {
         });
         if (existing) return existing;
 
-        const count = await m.count(Booking, { where: { tenantId, callId: call.callId } });
+        const count = await m.count(Booking, {
+          where: { tenantId, callId: call.callId },
+        });
         if (count >= MAX_BOOKINGS_PER_CALL) throw new TooManyBookingsError();
 
         const held = await this.createHold(m, {
@@ -135,33 +184,66 @@ export class BookingService {
           customerPhone: phone,
           notes,
         });
-        // TODO Week 4: enqueue the calendar-sync job here (after commit).
-        return this.transition(m, tenantId, held.id, 'confirmed', { holdExpiresAt: null });
-      });
 
+        return this.transition(m, tenantId, held.id, 'confirmed', {
+          holdExpiresAt: null,
+        });
+      });
+      // After commit, so the worker can see the row. Never fails the booking:
+      // if Redis is down, the sweep job picks it up later.
+      await this.enqueueCalendarSync(tenantId, booking.id);
       return {
         booked: true,
         booking_id: booking.id,
         service: service.name,
-        when: DateTime.fromJSDate(booking.startsAt, { zone: tz }).toFormat(LABEL_FORMAT),
+        when: DateTime.fromJSDate(booking.startsAt, { zone: tz }).toFormat(
+          LABEL_FORMAT,
+        ),
         duration_minutes: service.durationMinutes,
         customer_name: name,
       };
     } catch (e) {
       if (e instanceof TooManyBookingsError) {
-        return { error: 'too_many_bookings', message: 'Booking limit for one call reached. Offer to take a message instead.' };
+        return {
+          error: 'too_many_bookings',
+          message:
+            'Booking limit for one call reached. Offer to take a message instead.',
+        };
       }
       // Lost a race with another caller: the DB constraint is the final guard.
       if (isExclusionViolation(e)) {
         return {
           error: 'slot_unavailable',
-          message: 'That time was just taken. Call check_availability again and offer other times.',
+          message:
+            'That time was just taken. Call check_availability again and offer other times.',
         };
       }
       throw e;
     }
   }
 
+  private async enqueueCalendarSync(tenantId: string, bookingId: string) {
+    try {
+      // The caller is on the line: if Redis is unreachable, don't hang the reply.
+      await Promise.race([
+        this.calendarSync.add(
+          CREATE_EVENT_JOB,
+          { tenantId, bookingId },
+          { ...CREATE_EVENT_JOB_OPTS, jobId: createEventJobId(bookingId) },
+        ),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('queue add timed out')),
+            ENQUEUE_TIMEOUT_MS,
+          ),
+        ),
+      ]);
+    } catch (e) {
+      this.log.error(
+        `Could not queue calendar sync for booking ${bookingId}: ${String(e)}`,
+      );
+    }
+  }
   /** Insert a short-lived hold. Runs inside the caller's transaction. */
   private async createHold(
     m: EntityManager,
@@ -211,7 +293,9 @@ export class BookingService {
     if (!booking) throw new NotFoundException('Booking not found');
 
     if (!BOOKING_TRANSITIONS[booking.status].includes(to)) {
-      throw new ConflictException(`Illegal booking transition ${booking.status} -> ${to}`);
+      throw new ConflictException(
+        `Illegal booking transition ${booking.status} -> ${to}`,
+      );
     }
     Object.assign(booking, patch, { status: to });
     return m.save(booking);

@@ -45,7 +45,8 @@ export class ToolsController {
   @HttpCode(200)
   checkAvailability(
     @CurrentCall() call: CallContext,
-    @Body() body: { args?: { service_id?: string; date?: string } },
+    @Body()
+    body: { args?: { service_id?: string; date?: string; time?: string } },
   ) {
     this.log.log(
       `check_availability call=${call.retellCallId} args=${JSON.stringify(body?.args)}`,

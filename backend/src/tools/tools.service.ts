@@ -11,9 +11,11 @@ import {
   CalendarUnavailableError,
   TimeSlot,
 } from '../availability/availability.provider';
+import { nearestSlots } from './nearest-slots';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAX_DAYS_AHEAD = 60;
 const SEARCH_DAYS = 14;
 const SLOTS_FOR_REQUESTED_DAY = 6;
@@ -35,13 +37,21 @@ function pickSpread<T>(arr: T[], n: number): T[] {
 export class ToolsService {
   constructor(
     @InjectDataSource() private readonly ds: DataSource,
-    @InjectRepository(Service) private readonly serviceRepo: Repository<Service>,
-    @InjectRepository(BusinessHours) private readonly hoursRepo: Repository<BusinessHours>,
-    @Inject(AVAILABILITY_PROVIDER) private readonly availability: AvailabilityProvider,
+    @InjectRepository(Service)
+    private readonly serviceRepo: Repository<Service>,
+    @InjectRepository(BusinessHours)
+    private readonly hoursRepo: Repository<BusinessHours>,
+    @Inject(AVAILABILITY_PROVIDER)
+    private readonly availability: AvailabilityProvider,
   ) {}
 
-  private async getTenant(tenantId: string): Promise<{ name: string; timezone: string }> {
-    const rows = await this.ds.query(`SELECT name, timezone FROM tenants WHERE id = $1`, [tenantId]);
+  private async getTenant(
+    tenantId: string,
+  ): Promise<{ name: string; timezone: string }> {
+    const rows = await this.ds.query(
+      `SELECT name, timezone FROM tenants WHERE id = $1`,
+      [tenantId],
+    );
     if (!rows.length) throw new Error('Tenant not found');
     return { name: String(rows[0].name), timezone: String(rows[0].timezone) };
   }
@@ -50,7 +60,10 @@ export class ToolsService {
     const tenant = await this.getTenant(tenantId);
     const now = DateTime.now().setZone(tenant.timezone);
     const [services, hours] = await Promise.all([
-      this.serviceRepo.find({ where: { tenantId, active: true }, order: { name: 'ASC' } }),
+      this.serviceRepo.find({
+        where: { tenantId, active: true },
+        order: { name: 'ASC' },
+      }),
       this.hoursRepo.find({ where: { tenantId } }),
     ]);
 
@@ -61,20 +74,25 @@ export class ToolsService {
       return {
         day: DAY_NAMES[dow],
         hours: intervals.length
-          ? intervals.map((i) => `${fmtClock(i.openTime)} to ${fmtClock(i.closeTime)}`).join(', ')
+          ? intervals
+              .map((i) => `${fmtClock(i.openTime)} to ${fmtClock(i.closeTime)}`)
+              .join(', ')
           : 'Closed',
       };
     });
 
     const nowClock = now.toFormat('HH:mm:ss');
     const isOpenNow = hours.some(
-      (h) => h.dayOfWeek === now.weekday % 7 && nowClock >= h.openTime && nowClock < h.closeTime,
+      (h) =>
+        h.dayOfWeek === now.weekday % 7 &&
+        nowClock >= h.openTime &&
+        nowClock < h.closeTime,
     );
 
     return {
       business_name: tenant.name,
       timezone: tenant.timezone,
-      current_local_time: now.toFormat("cccc, d LLLL yyyy, h:mm a"),
+      current_local_time: now.toFormat('cccc, d LLLL yyyy, h:mm a'),
       current_local_date: now.toISODate(),
       is_open_now: isOpenNow,
       hours: weekly,
@@ -91,12 +109,23 @@ export class ToolsService {
    * Args come from the LLM, so treat them as untrusted input.
    * Errors are returned as data (HTTP 200) so the agent can recover out loud.
    */
-  async checkAvailability(tenantId: string, args: { service_id?: string; date?: string }) {
+  async checkAvailability(
+    tenantId: string,
+    args: { service_id?: string; date?: string; time?: string },
+  ) {
     if (!args?.service_id || !UUID_RE.test(args.service_id)) {
-      return { error: 'invalid_service', message: 'Pick a service from get_business_info first.' };
+      return {
+        error: 'invalid_service',
+        message: 'Pick a service from get_business_info first.',
+      };
     }
     if (!args.date || !DATE_RE.test(args.date)) {
       return { error: 'invalid_date', message: 'Date must be YYYY-MM-DD.' };
+    }
+     // Optional: the caller asked for a specific time ("around 2 PM" -> "14:00").
+    const time = args.time?.trim() || undefined;
+    if (time && !TIME_RE.test(time)) {
+      return { error: 'invalid_time', message: 'Time must be HH:mm in 24-hour format, e.g. 14:00.' };
     }
 
     const tenant = await this.getTenant(tenantId);
@@ -104,17 +133,29 @@ export class ToolsService {
     const requested = DateTime.fromISO(args.date, { zone: tz }).startOf('day');
     const today = DateTime.now().setZone(tz).startOf('day');
 
-    if (!requested.isValid) return { error: 'invalid_date', message: 'That date is not valid.' };
-    if (requested < today) return { error: 'date_in_past', message: 'That date has already passed.' };
+    if (!requested.isValid)
+      return { error: 'invalid_date', message: 'That date is not valid.' };
+    if (requested < today)
+      return {
+        error: 'date_in_past',
+        message: 'That date has already passed.',
+      };
     if (requested > today.plus({ days: MAX_DAYS_AHEAD })) {
-      return { error: 'too_far_ahead', message: `We only book up to ${MAX_DAYS_AHEAD} days ahead.` };
+      return {
+        error: 'too_far_ahead',
+        message: `We only book up to ${MAX_DAYS_AHEAD} days ahead.`,
+      };
     }
 
     // Tenant-scoped lookup: another tenant's service id simply won't be found.
     const service = await this.serviceRepo.findOne({
       where: { id: args.service_id, tenantId, active: true },
     });
-    if (!service) return { error: 'unknown_service', message: 'That service does not exist.' };
+    if (!service)
+      return {
+        error: 'unknown_service',
+        message: 'That service does not exist.',
+      };
 
     let all: TimeSlot[];
     try {
@@ -133,7 +174,8 @@ export class ToolsService {
 
     // Callers don't care which resource: collapse to unique start times.
     const unique = new Map<number, TimeSlot>();
-    for (const s of all) if (!unique.has(s.start.getTime())) unique.set(s.start.getTime(), s);
+    for (const s of all)
+      if (!unique.has(s.start.getTime())) unique.set(s.start.getTime(), s);
 
     const byDay = new Map<string, DateTime[]>();
     [...unique.values()]
@@ -151,6 +193,21 @@ export class ToolsService {
 
     const onDay = byDay.get(requested.toISODate()!) ?? [];
     if (onDay.length) {
+      if (time) {
+        const [h, m] = time.split(':').map(Number);
+        const target = requested.set({ hour: h, minute: m });
+        return {
+          service: service.name,
+          duration_minutes: service.durationMinutes,
+          requested_date_available: true,
+          requested_time_available: onDay.some(
+            (d) => d.toMillis() === target.toMillis(),
+          ),
+          slots: nearestSlots(onDay, target, SLOTS_FOR_REQUESTED_DAY).map(
+            toSlot,
+          ),
+        };
+      }
       return {
         service: service.name,
         duration_minutes: service.durationMinutes,
@@ -173,7 +230,9 @@ export class ToolsService {
       requested_date_available: false,
       slots: [],
       alternatives,
-      message: alternatives.length ? undefined : `Nothing available in the next ${SEARCH_DAYS} days.`,
+      message: alternatives.length
+        ? undefined
+        : `Nothing available in the next ${SEARCH_DAYS} days.`,
     };
   }
 }
