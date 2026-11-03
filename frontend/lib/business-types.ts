@@ -11,14 +11,27 @@ export type AppointmentItem = {
   customerName: string | null;
   customerPhone: string | null;
   notes: string | null;
+  calendarSyncStatus: CalendarSyncStatus;
   serviceName: string;
   resourceName: string;
 };
+
+/** pending = not in Google (yet, or the business doesn't use Google). */
+export type CalendarSyncStatus = "pending" | "synced" | "failed";
 
 export type AppointmentsResponse = {
   timezone: string;
   counts: { upcoming: number; past: number };
   items: AppointmentItem[];
+  canEdit: boolean;
+};
+
+export type RescheduleSlots = {
+  timezone: string;
+  date: string;
+  durationMinutes: number;
+  currentStart: string;
+  slots: { start: string; label: string }[];
 };
 
 export type Service = {

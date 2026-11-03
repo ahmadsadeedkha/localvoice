@@ -3,6 +3,7 @@ import {
   googleEventId,
   isAlreadyExists,
   isPermanentGoogleError,
+  isGone,
 } from './calendar-event';
 
 const bookingId = '3F2504E0-4F89-11D3-9A0C-0305E82C3301';
@@ -61,5 +62,13 @@ describe('error classification', () => {
     expect(isPermanentGoogleError({ status: 429 })).toBe(false);
     expect(isPermanentGoogleError({ status: 503 })).toBe(false);
     expect(isPermanentGoogleError(new Error('ECONNRESET'))).toBe(false);
+  });
+});
+
+describe('isGone', () => {
+  it('is true for 404 and 410 only', () => {
+    expect(isGone({ status: 404 })).toBe(true);
+    expect(isGone({ response: { status: 410 } })).toBe(true);
+    expect(isGone({ status: 409 })).toBe(false);
   });
 });

@@ -1,4 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Booking } from '../database/entities/booking.entity';
 import { GoogleCalendarService } from '../integrations/google/google-calendar.service';
 import {
   AvailabilityProvider,
@@ -7,7 +10,7 @@ import {
   TimeSlot,
 } from './availability.provider';
 import { MockAvailabilityProvider } from './mock-availability.provider';
-import { BusyInterval, subtractBusy } from './subtract-busy';
+import { BusyInterval, removeInterval, subtractBusy } from './subtract-busy';
 
 /** The caller is waiting on the phone: never let Google stall the conversation. */
 const GOOGLE_TIMEOUT_MS = 4000;
@@ -24,6 +27,7 @@ export class GoogleAvailabilityProvider implements AvailabilityProvider {
   constructor(
     private readonly db: MockAvailabilityProvider,
     private readonly google: GoogleCalendarService,
+    @InjectRepository(Booking) private readonly bookings: Repository<Booking>,
   ) {}
 
   async getFreeSlots(q: FreeSlotQuery): Promise<TimeSlot[]> {
@@ -37,7 +41,20 @@ export class GoogleAvailabilityProvider implements AvailabilityProvider {
       q.from,
       q.to,
     );
-    return subtractBusy(slots, busy);
+    return subtractBusy(slots, await this.withoutOwnEvent(busy, q));
+  }
+
+  /** When rescheduling, the booking's own Google event must not block its new time. */
+  private async withoutOwnEvent(
+    busy: BusyInterval[],
+    q: FreeSlotQuery,
+  ): Promise<BusyInterval[]> {
+    if (!q.excludeBookingId) return busy;
+    const own = await this.bookings.findOne({
+      where: { id: q.excludeBookingId, tenantId: q.tenantId },
+    });
+    if (!own?.calendarEventId) return busy; // never written to Google: nothing to remove
+    return removeInterval(busy, { start: own.startsAt, end: own.endsAt });
   }
 
   private async fetchBusy(

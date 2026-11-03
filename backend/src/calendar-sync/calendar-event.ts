@@ -54,3 +54,6 @@ export const isAlreadyExists = (e: unknown) => statusOf(e) === 409;
 /** Errors that retrying won't fix (bad request, calendar gone, no write access). */
 export const isPermanentGoogleError = (e: unknown) =>
   [400, 403, 404].includes(statusOf(e) ?? 0);
+
+/** 404/410: the event (or the calendar) is gone. */
+export const isGone = (e: unknown) => [404, 410].includes(statusOf(e) ?? 0);

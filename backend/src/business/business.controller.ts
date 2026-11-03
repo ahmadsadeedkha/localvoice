@@ -29,14 +29,15 @@ export class BusinessController {
   constructor(private readonly business: BusinessService) {}
 
   @Get('appointments')
-  appointments(
+  async appointments(
     @CurrentPrincipal() principal: Principal,
     @Query('view') view?: string,
   ) {
-    return this.business.appointments(
+    const data = await this.business.appointments(
       requireTenant(principal),
       view === 'past' ? 'past' : 'upcoming',
     );
+    return { ...data, canEdit: canEdit(principal) };
   }
 
   @Get('services')
@@ -47,7 +48,10 @@ export class BusinessController {
 
   @Post('services')
   @Roles(MemberRole.Owner, MemberRole.Admin)
-  createService(@CurrentPrincipal() principal: Principal, @Body() body: unknown) {
+  createService(
+    @CurrentPrincipal() principal: Principal,
+    @Body() body: unknown,
+  ) {
     return this.business.createService(
       requireTenant(principal),
       parseBody(createServiceSchema, body),

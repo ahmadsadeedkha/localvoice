@@ -5,7 +5,11 @@ import { DateTime } from 'luxon';
 import { Booking } from '../database/entities/booking.entity';
 import { BusinessHours } from '../database/entities/business-hours.entity';
 import { Resource } from '../database/entities/resource.entity';
-import { AvailabilityProvider, FreeSlotQuery, TimeSlot } from './availability.provider';
+import {
+  AvailabilityProvider,
+  FreeSlotQuery,
+  TimeSlot,
+} from './availability.provider';
 
 const SLOT_STEP_MINUTES = 30;
 const LEAD_TIME_MINUTES = 60; // don't offer slots starting in the next hour
@@ -18,9 +22,12 @@ const LEAD_TIME_MINUTES = 60; // don't offer slots starting in the next hour
 @Injectable()
 export class MockAvailabilityProvider implements AvailabilityProvider {
   constructor(
-    @InjectRepository(BusinessHours) private readonly hoursRepo: Repository<BusinessHours>,
-    @InjectRepository(Resource) private readonly resourceRepo: Repository<Resource>,
-    @InjectRepository(Booking) private readonly bookingRepo: Repository<Booking>,
+    @InjectRepository(BusinessHours)
+    private readonly hoursRepo: Repository<BusinessHours>,
+    @InjectRepository(Resource)
+    private readonly resourceRepo: Repository<Resource>,
+    @InjectRepository(Booking)
+    private readonly bookingRepo: Repository<Booking>,
   ) {}
 
   async getFreeSlots(q: FreeSlotQuery): Promise<TimeSlot[]> {
@@ -30,7 +37,13 @@ export class MockAvailabilityProvider implements AvailabilityProvider {
       this.bookingRepo
         .createQueryBuilder('b')
         .where('b.tenantId = :tenantId', { tenantId: q.tenantId })
-        .andWhere('b.startsAt < :to AND b.endsAt > :from', { from: q.from, to: q.to })
+        .andWhere('b.startsAt < :to AND b.endsAt > :from', {
+          from: q.from,
+          to: q.to,
+        })
+        .andWhere(q.excludeBookingId ? 'b.id != :excludeId' : '1=1', {
+          excludeId: q.excludeBookingId,
+        })
         .andWhere(
           new Brackets((qb) =>
             qb
@@ -45,7 +58,9 @@ export class MockAvailabilityProvider implements AvailabilityProvider {
     const slots: TimeSlot[] = [];
 
     let day = DateTime.fromJSDate(q.from, { zone: q.timezone }).startOf('day');
-    const lastDay = DateTime.fromJSDate(q.to, { zone: q.timezone }).startOf('day');
+    const lastDay = DateTime.fromJSDate(q.to, { zone: q.timezone }).startOf(
+      'day',
+    );
 
     for (; day <= lastDay; day = day.plus({ days: 1 })) {
       const dow = day.weekday % 7; // luxon: Mon=1..Sun=7 -> our 0=Sun..6=Sat
@@ -66,7 +81,8 @@ export class MockAvailabilityProvider implements AvailabilityProvider {
 
           for (const r of resources) {
             const clash = busy.some(
-              (b) => b.resourceId === r.id && start < b.endsAt && end > b.startsAt,
+              (b) =>
+                b.resourceId === r.id && start < b.endsAt && end > b.startsAt,
             );
             if (!clash) slots.push({ start, end, resourceId: r.id });
           }

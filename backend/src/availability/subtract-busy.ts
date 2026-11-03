@@ -19,3 +19,21 @@ export function subtractBusy(
     (s) => !busy.some((b) => s.start < b.end && s.end > b.start),
   );
 }
+
+/**
+ * Cuts one interval out of the busy list (splitting a block if needed).
+ * Used when rescheduling: the booking's own Google event shows as busy, but
+ * the booking is the thing being moved, so its own time must count as free.
+ */
+export function removeInterval(
+  busy: BusyInterval[],
+  cut: BusyInterval,
+): BusyInterval[] {
+  return busy.flatMap((b) => {
+    if (cut.end <= b.start || cut.start >= b.end) return [b]; // no overlap
+    const parts: BusyInterval[] = [];
+    if (b.start < cut.start) parts.push({ start: b.start, end: cut.start });
+    if (b.end > cut.end) parts.push({ start: cut.end, end: b.end });
+    return parts;
+  });
+}
