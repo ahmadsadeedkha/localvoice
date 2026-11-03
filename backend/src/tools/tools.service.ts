@@ -11,25 +11,41 @@ import {
   CalendarUnavailableError,
   TimeSlot,
 } from '../availability/availability.provider';
+import { SLOT_STEP_MINUTES } from '../availability/mock-availability.provider';
+import { freeRanges } from './free-ranges';
 import { nearestSlots } from './nearest-slots';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAX_DAYS_AHEAD = 60;
 const SEARCH_DAYS = 14;
-const SLOTS_FOR_REQUESTED_DAY = 6;
+const NEAREST_COUNT = 4;
 const ALT_DAYS = 3;
-const SLOTS_PER_ALT_DAY = 3;
-const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const ALT_SUGGESTIONS = 3;
+const DAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
 const MON_FIRST = [1, 2, 3, 4, 5, 6, 0];
 
-const fmtClock = (t: string) => DateTime.fromFormat(t.slice(0, 5), 'HH:mm').toFormat('h:mm a');
+const fmtClock = (t: string) =>
+  DateTime.fromFormat(t.slice(0, 5), 'HH:mm').toFormat('h:mm a');
 
 /** Evenly spread n picks so the caller hears morning AND afternoon options. */
 function pickSpread<T>(arr: T[], n: number): T[] {
   if (arr.length <= n) return arr;
-  const idx = new Set(Array.from({ length: n }, (_, i) => Math.round((i * (arr.length - 1)) / (n - 1))));
+  const idx = new Set(
+    Array.from({ length: n }, (_, i) =>
+      Math.round((i * (arr.length - 1)) / (n - 1)),
+    ),
+  );
   return [...idx].map((i) => arr[i]);
 }
 
@@ -122,10 +138,13 @@ export class ToolsService {
     if (!args.date || !DATE_RE.test(args.date)) {
       return { error: 'invalid_date', message: 'Date must be YYYY-MM-DD.' };
     }
-     // Optional: the caller asked for a specific time ("around 2 PM" -> "14:00").
+    // Optional: the caller asked for a specific time ("around 2 PM" -> "14:00").
     const time = args.time?.trim() || undefined;
     if (time && !TIME_RE.test(time)) {
-      return { error: 'invalid_time', message: 'Time must be HH:mm in 24-hour format, e.g. 14:00.' };
+      return {
+        error: 'invalid_time',
+        message: 'Time must be HH:mm in 24-hour format, e.g. 14:00.',
+      };
     }
 
     const tenant = await this.getTenant(tenantId);
@@ -187,48 +206,71 @@ export class ToolsService {
       });
 
     const toSlot = (dt: DateTime) => ({
-      start: dt.toISO(), // includes UTC offset; pass back unchanged to book_appointment
-      label: dt.toFormat("cccc, d LLLL 'at' h:mm a"),
+      start: dt.toISO()!, // includes UTC offset; pass back unchanged to book_appointment
+      label: dt.toFormat('h:mm a'),
     });
+    const dayLabel = (d: DateTime) => d.toFormat('cccc, d LLLL');
+    const target = time
+      ? requested.set({
+          hour: Number(time.slice(0, 2)),
+          minute: Number(time.slice(3, 5)),
+        })
+      : null;
 
     const onDay = byDay.get(requested.toISODate()!) ?? [];
     if (onDay.length) {
-      if (time) {
-        const [h, m] = time.split(':').map(Number);
-        const target = requested.set({ hour: h, minute: m });
-        return {
-          service: service.name,
-          duration_minutes: service.durationMinutes,
-          requested_date_available: true,
-          requested_time_available: onDay.some(
-            (d) => d.toMillis() === target.toMillis(),
-          ),
-          slots: nearestSlots(onDay, target, SLOTS_FOR_REQUESTED_DAY).map(
-            toSlot,
-          ),
-        };
-      }
+      const exact = target
+        ? onDay.find((d) => d.toMillis() === target.toMillis())
+        : undefined;
       return {
         service: service.name,
         duration_minutes: service.durationMinutes,
+        date: requested.toISODate(),
+        day_label: dayLabel(requested),
         requested_date_available: true,
-        slots: pickSpread(onDay, SLOTS_FOR_REQUESTED_DAY).map(toSlot),
+        ...(target && {
+          requested_time: target.toFormat('h:mm a'),
+          requested_time_available: !!exact,
+          // Available: book this exact start. Not available: offer these instead.
+          ...(exact
+            ? { start: exact.toISO() }
+            : {
+                nearest: nearestSlots(onDay, target, NEAREST_COUNT).map(toSlot),
+              }),
+        }),
+        // Start-time windows, for "what times do you have?" answers.
+        free_ranges: freeRanges(onDay, SLOT_STEP_MINUTES),
+        // Every free start time that day, so follow-ups ("what about 2:15?")
+        // can be answered and booked without calling this tool again.
+        slots: onDay.map(toSlot),
       };
     }
 
     const alternatives = [...byDay.entries()]
       .filter(([day]) => day !== requested.toISODate())
       .slice(0, ALT_DAYS)
-      .map(([day, dts]) => ({
-        date: day,
-        slots: pickSpread(dts, SLOTS_PER_ALT_DAY).map(toSlot),
-      }));
+      .map(([day, dts]) => {
+        const d = DateTime.fromISO(day, { zone: tz });
+        const sameTime = target
+          ? d.set({ hour: target.hour, minute: target.minute })
+          : null;
+        return {
+          date: day,
+          day_label: dayLabel(d),
+          free_ranges: freeRanges(dts, SLOT_STEP_MINUTES),
+          suggested: (sameTime
+            ? nearestSlots(dts, sameTime, ALT_SUGGESTIONS)
+            : pickSpread(dts, ALT_SUGGESTIONS)
+          ).map(toSlot),
+        };
+      });
 
     return {
       service: service.name,
       duration_minutes: service.durationMinutes,
+      date: requested.toISODate(),
+      day_label: dayLabel(requested),
       requested_date_available: false,
-      slots: [],
       alternatives,
       message: alternatives.length
         ? undefined

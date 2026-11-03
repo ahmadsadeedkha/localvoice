@@ -11,7 +11,8 @@ import {
   TimeSlot,
 } from './availability.provider';
 
-const SLOT_STEP_MINUTES = 30;
+/** Start times are offered every 15 minutes (9:00, 9:15, 9:30 ...). */
+export const SLOT_STEP_MINUTES = 15;
 const LEAD_TIME_MINUTES = 60; // don't offer slots starting in the next hour
 
 /**
