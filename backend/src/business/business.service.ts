@@ -35,7 +35,7 @@ export class BusinessService {
     const [rows, counts, timezone] = await Promise.all([
       this.ds.query(
         `SELECT b.id, b.call_id, b.starts_at, b.ends_at, b.status,
-                b.customer_name, b.customer_phone, b.notes,
+                b.customer_name, b.customer_phone, b.notes, b.calendar_sync_status,
                 s.name AS service_name, r.name AS resource_name
          FROM bookings b
          JOIN services s ON s.id = b.service_id
@@ -73,6 +73,7 @@ export class BusinessService {
         customerName: r.customer_name,
         customerPhone: r.customer_phone,
         notes: r.notes,
+        calendarSyncStatus: r.calendar_sync_status,
         serviceName: r.service_name,
         resourceName: r.resource_name,
       })),

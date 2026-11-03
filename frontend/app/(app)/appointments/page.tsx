@@ -6,6 +6,8 @@ import { DataTable, type Column } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { PhoneNumber } from "@/components/phone-number";
 import { BookingStatusBadge } from "@/components/booking-status-badge";
+import { AppointmentActions } from "@/components/appointments/appointment-actions";
+import { CalendarSyncNote } from "@/components/appointments/calendar-sync-note";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { apiFetch } from "@/lib/api";
@@ -60,7 +62,14 @@ async function AppointmentsData({
     {
       key: "status",
       header: "Status",
-      cell: (a) => <BookingStatusBadge status={a.status} />,
+      cell: (a) => (
+        <div>
+          <BookingStatusBadge status={a.status} />
+          {a.status === "confirmed" && (
+            <CalendarSyncNote status={a.calendarSyncStatus} />
+          )}
+        </div>
+      ),
     },
     {
       key: "source",
@@ -79,6 +88,18 @@ async function AppointmentsData({
       className: "text-right",
     },
   ];
+
+  // Only upcoming appointments can be moved or cancelled, by owners and admins.
+  if (view === "upcoming" && data.canEdit) {
+    columns.push({
+      key: "actions",
+      header: "",
+      cell: (a) => (
+        <AppointmentActions appointment={a} timezone={data.timezone} />
+      ),
+      className: "w-12 text-right",
+    });
+  }
 
   return (
     <>

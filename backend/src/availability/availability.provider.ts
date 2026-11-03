@@ -11,6 +11,8 @@ export interface FreeSlotQuery {
   durationMinutes: number;
   from: Date;
   to: Date;
+  /** Rescheduling: ignore this booking's own time, so it can move to an overlapping slot. */
+  excludeBookingId?: string;
 }
 
 export interface AvailabilityProvider {

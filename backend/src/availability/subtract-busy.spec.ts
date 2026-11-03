@@ -1,4 +1,4 @@
-import { subtractBusy } from './subtract-busy';
+import { removeInterval, subtractBusy } from './subtract-busy';
 
 const at = (hhmm: string) => new Date(`2026-11-02T${hhmm}:00Z`);
 const slot = (from: string, to: string, resourceId = 'r1') => ({
@@ -43,5 +43,36 @@ describe('subtractBusy', () => {
     expect(
       subtractBusy(two, [{ start: at('09:15'), end: at('09:30') }]),
     ).toEqual([]);
+  });
+});
+
+describe('removeInterval', () => {
+  const block = (from: string, to: string) => ({
+    start: at(from),
+    end: at(to),
+  });
+
+  it('removes a block that exactly matches', () => {
+    expect(
+      removeInterval([block('10:00', '11:00')], block('10:00', '11:00')),
+    ).toEqual([]);
+  });
+
+  it('keeps the rest of a merged block', () => {
+    // Booking 10-11 sits next to another event 11-12; Google merges them into 10-12.
+    expect(
+      removeInterval([block('10:00', '12:00')], block('10:00', '11:00')),
+    ).toEqual([block('11:00', '12:00')]);
+  });
+
+  it('splits a block around the cut', () => {
+    expect(
+      removeInterval([block('09:00', '12:00')], block('10:00', '11:00')),
+    ).toEqual([block('09:00', '10:00'), block('11:00', '12:00')]);
+  });
+
+  it('leaves non-overlapping blocks alone', () => {
+    const busy = [block('08:00', '09:00'), block('11:00', '12:00')];
+    expect(removeInterval(busy, block('09:00', '11:00'))).toEqual(busy);
   });
 });
