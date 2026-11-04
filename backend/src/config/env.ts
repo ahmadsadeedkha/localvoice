@@ -1,3 +1,4 @@
+import { IANAZone } from 'luxon';
 import { z } from 'zod';
 
 const schema = z.object({
@@ -19,6 +20,13 @@ const schema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   GOOGLE_REDIRECT_URI: z.url().optional(),
   GOOGLE_TOKEN_ENC_KEY: z.string().optional(),
+  DEFAULT_TIMEZONE: z
+    .string()
+    .default('Asia/Karachi')
+    .refine((tz) => IANAZone.isValidZone(tz), {
+      message:
+        'DEFAULT_TIMEZONE must be a valid IANA timezone, e.g. Asia/Karachi',
+    }),
   FRONTEND_URL: z.url().default('http://localhost:3000'),
   ALLOWED_ORIGINS: z
     .string()
