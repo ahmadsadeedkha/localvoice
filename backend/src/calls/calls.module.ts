@@ -6,9 +6,10 @@ import { CallContextGuard } from './call-context.guard';
 import { DevCallsController } from './dev-calls.controller';
 import { CallsQueryService } from './calls-query.service';
 import { CallsController } from './calls.controller';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Call])],
+  imports: [TypeOrmModule.forFeature([Call]), BillingModule],
   controllers: [
     CallsController,
     ...(process.env.NODE_ENV !== 'production' ||

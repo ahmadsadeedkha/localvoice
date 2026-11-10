@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Header, Post } from '@nestjs/common';
 import { CallsService } from './calls.service';
 import { Public } from '../auth/decorators';
+import { WalletService } from '../billing/wallet.service';
 
 /**
  * DEV ONLY. Registered only outside production (see CallsModule).
@@ -91,7 +92,7 @@ const TEST_PAGE = `<!doctype html>
 @Public()
 @Controller('dev/calls')
 export class DevCallsController {
-  constructor(private readonly calls: CallsService) {}
+  constructor(private readonly calls: CallsService, private readonly wallets: WalletService) {}
 
   @Get('test-page')
   @Header('Content-Type', 'text/html; charset=utf-8')
@@ -100,7 +101,8 @@ export class DevCallsController {
   }
 
   @Post('web')
-  createWebCall(@Body() body: { tenantId: string }) {
+  async createWebCall(@Body() body: { tenantId: string }) {
+    await this.wallets.assertCanStartCall(body.tenantId); // throws 402 if blocked
     return this.calls.createWebCall(body.tenantId);
   }
 }
