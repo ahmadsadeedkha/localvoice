@@ -1,9 +1,16 @@
-import { Column, CreateDateColumn, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  PrimaryColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 import { numeric } from '../common/numeric.transformer';
 
 @Entity('tenant_wallets')
 export class TenantWallet {
   @PrimaryColumn('uuid', { name: 'tenant_id' }) tenantId: string;
+
   @Column({
     name: 'billing_mode',
     type: 'enum',
@@ -11,6 +18,7 @@ export class TenantWallet {
     enumName: 'billing_mode_enum',
   })
   billingMode: 'prepaid' | 'postpaid';
+
   @Column({
     name: 'balance_credits',
     type: 'numeric',
@@ -19,6 +27,7 @@ export class TenantWallet {
     transformer: numeric,
   })
   balanceCredits: number;
+
   @Column({
     name: 'credit_limit',
     type: 'numeric',
@@ -27,6 +36,7 @@ export class TenantWallet {
     transformer: numeric,
   })
   creditLimit: number;
+
   @Column({
     name: 'low_balance_threshold',
     type: 'numeric',
@@ -35,12 +45,14 @@ export class TenantWallet {
     transformer: numeric,
   })
   lowBalanceThreshold: number;
+
   @Column({
     name: 'low_balance_notified_at',
     type: 'timestamptz',
     nullable: true,
   })
   lowBalanceNotifiedAt: Date | null;
+
   @Column({
     name: 'blocked_reason',
     type: 'enum',
@@ -49,6 +61,23 @@ export class TenantWallet {
     nullable: true,
   })
   blockedReason: 'no_balance' | 'invoice_unpaid' | null;
+
+  @Column({
+    name: 'price_per_credit',
+    type: 'numeric',
+    precision: 14,
+    scale: 4,
+    nullable: true,
+    transformer: numeric,
+  })
+  pricePerCredit: number | null;
+
+  @Column({ type: 'varchar', length: 3, nullable: true })
+  currency: string | null;
+
+  @Column({ name: 'invoice_due_days', type: 'int' }) invoiceDueDays: number;
+
   @CreateDateColumn({ name: 'created_at' }) createdAt: Date;
+
   @UpdateDateColumn({ name: 'updated_at' }) updatedAt: Date;
 }
