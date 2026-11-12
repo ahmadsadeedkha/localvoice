@@ -14,12 +14,8 @@ import { Repository } from 'typeorm';
 import { Request } from 'express';
 import Retell from 'retell-sdk';
 import { WalletService } from './wallet.service';
-import { Tenant } from '../tenants/tenant.entity';
-
-// If our own lookup fails (DB down, bug): true = let the call through,
-// false = reject it. Letting calls through is the safer default for paying
-// customers; flip it if you'd rather never give free calls.
-const FAIL_OPEN = true;
+import { Tenant, TenantStatus } from '../tenants/tenant.entity';
+import { Public } from '../auth/decorators';
 
 @Controller('webhooks/retell-inbound')
 export class RetellInboundController {
@@ -30,6 +26,7 @@ export class RetellInboundController {
     @InjectRepository(Tenant) private tenants: Repository<Tenant>,
   ) {}
 
+  @Public()
   @Post()
   @HttpCode(200)
   async handle(
@@ -46,16 +43,32 @@ export class RetellInboundController {
     if (!valid) throw new UnauthorizedException();
 
     const agentId: string | undefined = body?.call_inbound?.agent_id;
+    const number = body?.call_inbound?.to_number;
+    if (typeof number !== 'string' || !/^\+[1-9]\d{6,14}$/.test(number)) {
+      return { call_inbound: { reject: true } };
+    }
 
     try {
-      const tenant = await this.tenants.findOne({
-        where: { retellAgentId: agentId },
-        select: { id: true },
-      });
-      if (!tenant) {
-        this.log.warn(`Inbound call for unknown agent ${agentId}`);
-        return { call_inbound: { override_agent_id: agentId } };
+      const matches = await this.tenants
+        .createQueryBuilder('t')
+        .select(['t.id', 't.status', 't.retellAgentId'])
+        .where(
+          `t.twilioNumber = :number OR EXISTS (
+          SELECT 1 FROM phone_numbers p WHERE p.tenant_id = t.id AND p.e164 = :number
+        )`,
+          { number },
+        )
+        .take(2)
+        .getMany();
+      if (
+        matches.length !== 1 ||
+        matches[0].status === TenantStatus.Suspended
+      ) {
+        return { call_inbound: { reject: true } };
       }
+      const tenant = matches[0];
+      const selectedAgentId = tenant.retellAgentId ?? agentId;
+      if (!selectedAgentId) return { call_inbound: { reject: true } };
 
       const gate = await this.wallets.getCallGate(tenant.id);
 
@@ -78,7 +91,7 @@ export class RetellInboundController {
 
       return {
         call_inbound: {
-          override_agent_id: agentId,
+          override_agent_id: selectedAgentId,
           metadata: { tenant_id: tenant.id }, // resolveTenantId reads this at call_ended
           agent_override: {
             agent: { max_call_duration_ms: gate.maxDurationMs },
@@ -87,11 +100,9 @@ export class RetellInboundController {
       };
     } catch (e) {
       this.log.error(
-        `Inbound gate failed: ${e instanceof Error ? e.message : e}`,
+        `Inbound gate failed: ${e instanceof Error ? e.message : String(e)}`,
       );
-      return FAIL_OPEN
-        ? { call_inbound: { override_agent_id: agentId } }
-        : { call_inbound: { reject: true } };
+      return { call_inbound: { reject: true } };
     }
   }
 }

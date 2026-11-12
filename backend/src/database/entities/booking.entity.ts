@@ -50,6 +50,8 @@ export class Booking {
     nullable: true,
   })
   calendarEventId: string | null;
+  @Column({ name: 'calendar_id', type: 'varchar', length: 255, nullable: true })
+  calendarId: string | null;
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })

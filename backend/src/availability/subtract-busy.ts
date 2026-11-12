@@ -22,8 +22,8 @@ export function subtractBusy(
 
 /**
  * Cuts one interval out of the busy list (splitting a block if needed).
- * Used when rescheduling: the booking's own Google event shows as busy, but
- * the booking is the thing being moved, so its own time must count as free.
+ * Only use when the whole cut is known to be removable. Aggregated calendar
+ * busy intervals cannot identify which individual event owns a time range.
  */
 export function removeInterval(
   busy: BusyInterval[],

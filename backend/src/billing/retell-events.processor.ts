@@ -22,16 +22,16 @@ export class RetellEventsProcessor extends WorkerHost {
   }
 
   async process(job: Job) {
-    const { call } = job.data;
+    const { call, tenantId: resolvedTenantId } = job.data;
     const key = {
       provider: WebhookProvider.Retell,
-      externalEventId: `${call.call_id}:${job.name}`,
+      externalEventId: job.data.externalEventId ?? `${call.call_id}:${job.name}`,
     };
     try {
       let tenantId: string | null = null;
-      if (job.name === 'call_ended') tenantId = await this.onCallEnded(call);
+      if (job.name === 'call_ended') tenantId = await this.onCallEnded(call, resolvedTenantId);
       else if (job.name === 'call_analyzed')
-        tenantId = await this.onCallAnalyzed(call);
+        tenantId = await this.onCallAnalyzed(call, resolvedTenantId);
 
       await this.events.update(key, {
         status: WebhookEventStatus.Processed,
@@ -57,8 +57,8 @@ export class RetellEventsProcessor extends WorkerHost {
     return byAgent?.id ?? null;
   }
 
-  private async onCallEnded(call: any): Promise<string | null> {
-    const tenantId = await this.resolveTenantId(call);
+  private async onCallEnded(call: any, resolvedTenantId?: string): Promise<string | null> {
+    const tenantId = resolvedTenantId ?? await this.resolveTenantId(call);
     if (!tenantId) {
       console.warn('No tenant for call', call.call_id);
       return null;
@@ -94,8 +94,8 @@ export class RetellEventsProcessor extends WorkerHost {
     return tenantId;
   }
 
-  private async onCallAnalyzed(call: any): Promise<string | null> {
-    const tenantId = await this.resolveTenantId(call);
+  private async onCallAnalyzed(call: any, resolvedTenantId?: string): Promise<string | null> {
+    const tenantId = resolvedTenantId ?? await this.resolveTenantId(call);
     
     // 1) save summary / sentiment on your calls table (your existing logic)
     // 2) backfill cost only; never charge here

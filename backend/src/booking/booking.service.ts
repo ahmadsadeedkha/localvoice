@@ -127,6 +127,18 @@ export class BookingService {
         message: 'That service does not exist.',
       };
 
+    // A retry must return the committed booking before availability excludes it.
+    const existing = await this.ds.getRepository(Booking).findOne({
+      where: {
+        tenantId,
+        callId: call.callId,
+        serviceId: service.id,
+        startsAt: startDt.toJSDate(),
+        status: 'confirmed',
+      },
+    });
+    if (existing) return this.bookingResult(existing, service, tz);
+
     // The requested start must be a genuinely free slot right now.
     const local = startDt.setZone(tz);
     // With Google connected, this re-checks the real calendar right before booking.
@@ -192,16 +204,7 @@ export class BookingService {
       // After commit, so the worker can see the row. Never fails the booking:
       // if Redis is down, the sweep job picks it up later.
       await this.enqueueCalendarSync(tenantId, booking.id);
-      return {
-        booked: true,
-        booking_id: booking.id,
-        service: service.name,
-        when: DateTime.fromJSDate(booking.startsAt, { zone: tz }).toFormat(
-          LABEL_FORMAT,
-        ),
-        duration_minutes: service.durationMinutes,
-        customer_name: name,
-      };
+      return this.bookingResult(booking, service, tz);
     } catch (e) {
       if (e instanceof TooManyBookingsError) {
         return {
@@ -220,6 +223,17 @@ export class BookingService {
       }
       throw e;
     }
+  }
+
+  private bookingResult(booking: Booking, service: Service, timezone: string) {
+    return {
+      booked: true,
+      booking_id: booking.id,
+      service: service.name,
+      when: DateTime.fromJSDate(booking.startsAt, { zone: timezone }).toFormat(LABEL_FORMAT),
+      duration_minutes: service.durationMinutes,
+      customer_name: booking.customerName,
+    };
   }
 
   private async enqueueCalendarSync(tenantId: string, bookingId: string) {
