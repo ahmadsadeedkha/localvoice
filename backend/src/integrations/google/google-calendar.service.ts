@@ -217,6 +217,15 @@ export class GoogleCalendarService {
 
   // ---------- For availability + sync (steps 3 and 4) ----------
 
+  /** Missing/deleted connections opt out; revoked connections must fail closed. */
+  async availabilityConnection(tenantId: string) {
+    const c = await this.repo.findOne({ where: { tenantId } });
+    if (c?.status === 'revoked') {
+      throw new GoogleNotConnectedError('Reconnect Google Calendar before booking');
+    }
+    return c?.calendarId ? c : null;
+  }
+
   /** The active connection with a chosen calendar, or null if the tenant isn't using Google. */
   async activeConnection(tenantId: string) {
     const c = await this.repo.findOne({

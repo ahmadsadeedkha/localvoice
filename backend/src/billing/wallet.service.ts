@@ -1,6 +1,7 @@
-import { DataSource } from 'typeorm';
+import { DataSource, EntityManager } from 'typeorm';
 import { TenantWallet } from './tenant-wallet.entity';
 import { CreditLedger } from './credit-ledger.entity';
+import { Tenant, TenantStatus } from '../tenants/tenant.entity';
 import {
   BadRequestException,
   HttpException,
@@ -10,7 +11,11 @@ import {
 
 export type CallGate =
   | { allowed: true; maxDurationMs: number }
-  | { allowed: false; reason: 'no_balance' | 'invoice_unpaid' | 'no_wallet' };
+  | {
+      allowed: false;
+      reason:
+        'no_balance' | 'invoice_unpaid' | 'no_wallet' | 'tenant_suspended';
+    };
 
 export type TopUpType = 'purchase' | 'grant' | 'adjustment';
 
@@ -74,6 +79,12 @@ export class WalletService {
   }
 
   async getCallGate(tenantId: string): Promise<CallGate> {
+    const tenant = await this.ds
+      .getRepository(Tenant)
+      .findOne({ where: { id: tenantId } });
+    if (!tenant || tenant.status === TenantStatus.Suspended) {
+      return { allowed: false, reason: 'tenant_suspended' };
+    }
     const w = await this.ds
       .getRepository(TenantWallet)
       .findOne({ where: { tenantId } });
@@ -119,13 +130,16 @@ export class WalletService {
     return this.ds.getRepository(TenantWallet).findOne({ where: { tenantId } });
   }
 
-  async topUp(p: {
-    tenantId: string;
-    credits: number;
-    type?: TopUpType;
-    paymentRef?: string; // gateway transaction id; required for 'purchase'
-    note?: string;
-  }) {
+  async topUp(
+    p: {
+      tenantId: string;
+      credits: number;
+      type?: TopUpType;
+      paymentRef?: string; // gateway transaction id; required for 'purchase'
+      note?: string;
+    },
+    manager?: EntityManager,
+  ) {
     if (!Number.isFinite(p.credits) || p.credits <= 0) {
       throw new BadRequestException('credits must be a positive number');
     }
@@ -134,7 +148,7 @@ export class WalletService {
       throw new BadRequestException('purchase requires a paymentRef');
     }
 
-    return this.ds.transaction(async (m) => {
+    const credit = async (m: EntityManager) => {
       const tenant = await m.query(`SELECT 1 FROM tenants WHERE id = $1`, [
         p.tenantId,
       ]);
@@ -190,6 +204,7 @@ export class WalletService {
 
       await m.save(wallet);
       return { credited: true as const, before, after };
-    });
+    };
+    return manager ? credit(manager) : this.ds.transaction(credit);
   }
 }

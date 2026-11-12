@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { DateTime } from 'luxon';
+import { type calendar_v3 } from '@googleapis/calendar';
 import { Booking } from '../database/entities/booking.entity';
 import { GoogleCalendarService } from '../integrations/google/google-calendar.service';
 import {
@@ -10,7 +12,7 @@ import {
   TimeSlot,
 } from './availability.provider';
 import { MockAvailabilityProvider } from './mock-availability.provider';
-import { BusyInterval, removeInterval, subtractBusy } from './subtract-busy';
+import { BusyInterval, subtractBusy } from './subtract-busy';
 
 /** The caller is waiting on the phone: never let Google stall the conversation. */
 const GOOGLE_TIMEOUT_MS = 4000;
@@ -31,30 +33,96 @@ export class GoogleAvailabilityProvider implements AvailabilityProvider {
   ) {}
 
   async getFreeSlots(q: FreeSlotQuery): Promise<TimeSlot[]> {
-    const connection = await this.google.activeConnection(q.tenantId);
+    const connection = await this.google
+      .availabilityConnection(q.tenantId)
+      .catch((e: unknown) => {
+        throw new CalendarUnavailableError(String(e));
+      });
     const slots = await this.db.getFreeSlots(q);
     if (!connection || !slots.length) return slots;
 
-    const busy = await this.fetchBusy(
-      q.tenantId,
-      connection.calendarId!,
-      q.from,
-      q.to,
-    );
-    return subtractBusy(slots, await this.withoutOwnEvent(busy, q));
+    const own = q.excludeBookingId
+      ? await this.bookings.findOne({
+          where: { id: q.excludeBookingId, tenantId: q.tenantId },
+        })
+      : null;
+    // Free/busy merges overlapping events, so only event identities can safely
+    // exclude our event while preserving any other event at the same time.
+    const busy = own?.calendarEventId
+      ? await this.fetchBusyEvents(
+          q,
+          connection.calendarId!,
+          own.calendarEventId,
+        )
+      : await this.fetchBusy(q.tenantId, connection.calendarId!, q.from, q.to);
+    return subtractBusy(slots, busy);
   }
 
   /** When rescheduling, the booking's own Google event must not block its new time. */
-  private async withoutOwnEvent(
-    busy: BusyInterval[],
+  private async fetchBusyEvents(
     q: FreeSlotQuery,
+    calendarId: string,
+    excludedEventId: string,
   ): Promise<BusyInterval[]> {
-    if (!q.excludeBookingId) return busy;
-    const own = await this.bookings.findOne({
-      where: { id: q.excludeBookingId, tenantId: q.tenantId },
+    try {
+      const deadline = Date.now() + GOOGLE_TIMEOUT_MS;
+      const api = await this.google.calendarApi(q.tenantId);
+      const busy: BusyInterval[] = [];
+      let pageToken: string | undefined;
+      do {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) throw new Error('Calendar events lookup timed out');
+        const res = await this.google.call(q.tenantId, () =>
+          api.events.list(
+            {
+              calendarId,
+              timeMin: q.from.toISOString(),
+              timeMax: q.to.toISOString(),
+              singleEvents: true, // Expand recurring instances within the window.
+              showDeleted: false,
+              maxResults: 2500,
+              pageToken,
+            },
+            { timeout: remaining },
+          ),
+        );
+        for (const event of res.data.items ?? []) {
+          if (
+            event.id === excludedEventId ||
+            event.status === 'cancelled' ||
+            event.transparency === 'transparent' ||
+            event.attendees?.some(
+              (a) => a.self && a.responseStatus === 'declined',
+            )
+          )
+            continue;
+          const zone = res.data.timeZone ?? q.timezone;
+          const start = this.eventTime(event.start, zone);
+          const end = this.eventTime(event.end, zone);
+          if (!start.isValid || !end.isValid || end <= start) {
+            throw new Error('Calendar event has invalid start/end');
+          }
+          busy.push({ start: start.toJSDate(), end: end.toJSDate() });
+        }
+        pageToken = res.data.nextPageToken ?? undefined;
+      } while (pageToken);
+      return busy;
+    } catch (e) {
+      this.log.error(
+        `Google events lookup failed for tenant ${q.tenantId}: ${String(e)}`,
+      );
+      throw new CalendarUnavailableError(String(e));
+    }
+  }
+
+  private eventTime(
+    value: calendar_v3.Schema$EventDateTime | undefined,
+    calendarZone: string,
+  ) {
+    // All-day date boundaries use the calendar's timezone, not the server's.
+    return DateTime.fromISO(value?.dateTime ?? value?.date ?? '', {
+      zone: value?.timeZone ?? calendarZone,
     });
-    if (!own?.calendarEventId) return busy; // never written to Google: nothing to remove
-    return removeInterval(busy, { start: own.startsAt, end: own.endsAt });
   }
 
   private async fetchBusy(

@@ -150,7 +150,9 @@ export class AppointmentChangesService {
   async cancel(tenantId: string, bookingId: string) {
     await this.changeable(tenantId, bookingId);
     await this.ds.transaction((m) =>
-      this.bookings.transition(m, tenantId, bookingId, 'cancelled'),
+      this.bookings.transition(m, tenantId, bookingId, 'cancelled', {
+        calendarSyncStatus: 'pending',
+      }),
     );
     await enqueueSync(
       this.calendarSync,

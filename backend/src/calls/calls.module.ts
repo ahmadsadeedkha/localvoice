@@ -7,9 +7,10 @@ import { DevCallsController } from './dev-calls.controller';
 import { CallsQueryService } from './calls-query.service';
 import { CallsController } from './calls.controller';
 import { BillingModule } from '../billing/billing.module';
+import { TenantsModule } from '../tenants/tenant.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Call]), BillingModule],
+  imports: [TypeOrmModule.forFeature([Call]), BillingModule, TenantsModule],
   controllers: [
     CallsController,
     ...(process.env.NODE_ENV !== 'production' ||

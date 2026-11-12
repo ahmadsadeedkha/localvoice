@@ -8,11 +8,13 @@ import { RetellWebhookController } from './retell/retell-webhook.controller';
 import { RetellWebhookService } from './retell/retell-webhook.service';
 import { Call } from '../database/entities/call.entity';
 import { Tenant } from '../tenants/tenant.entity';
+import { BullModule } from '@nestjs/bullmq';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([WebhookEvent, Call, Tenant]),
     TenantsModule,
+    BullModule.registerQueue({ name: 'retell-events' }),
   ],
   controllers: [ClerkWebhookController, RetellWebhookController],
   providers: [ClerkWebhookService, RetellWebhookService],

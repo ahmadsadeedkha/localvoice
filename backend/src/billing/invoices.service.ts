@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -69,6 +70,20 @@ export class InvoicesService {
 
   /** Idempotent: one invoice per tenant per month. Returns null if nothing to bill. */
   async generateForTenant(tenantId: string, periodStart: Date) {
+    const periodEnd = addMonthUtc(periodStart);
+    if (
+      !Number.isFinite(periodStart.getTime()) ||
+      periodStart.getTime() !==
+        monthStartUtc(
+          periodStart.getUTCFullYear(),
+          periodStart.getUTCMonth() + 1,
+        ).getTime() ||
+      periodEnd.getTime() > Date.now()
+    ) {
+      throw new BadRequestException(
+        'Only completed UTC calendar months can be invoiced',
+      );
+    }
     const wallet = await this.ds
       .getRepository(TenantWallet)
       .findOne({ where: { tenantId } });
@@ -79,7 +94,6 @@ export class InvoicesService {
     });
     if (existing) return { invoice: existing, created: false };
 
-    const periodEnd = addMonthUtc(periodStart);
     const used = await this.usedCredits(tenantId, periodStart, periodEnd);
     if (used <= 0) return null;
 
@@ -127,7 +141,7 @@ export class InvoicesService {
       } catch (e) {
         failed++;
         this.log.error(
-          `Invoice generation failed for tenant ${tenant_id}: ${e instanceof Error ? e.message : e}`,
+          `Invoice generation failed for tenant ${tenant_id}: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     }
@@ -179,7 +193,13 @@ export class InvoicesService {
       } else {
         inv.reminder3dSentAt = now;
       }
-      await this.invoices.save(inv);
+      await this.invoices.update(
+        { id: inv.id, status: InvoiceStatus.Open },
+        {
+          reminder1dSentAt: inv.reminder1dSentAt,
+          reminder3dSentAt: inv.reminder3dSentAt,
+        },
+      );
       reminded++;
     }
 
@@ -204,6 +224,14 @@ export class InvoicesService {
         lock: { mode: 'pessimistic_write' },
       });
       if (!w || w.blockedReason === 'invoice_unpaid') return false;
+      const overdue = await m.count(Invoice, {
+        where: {
+          tenantId,
+          status: InvoiceStatus.Open,
+          dueAt: LessThanOrEqual(new Date()),
+        },
+      });
+      if (!overdue) return false;
       w.blockedReason = 'invoice_unpaid';
       await m.save(w);
       return true;
@@ -232,35 +260,26 @@ export class InvoicesService {
 
   // ---------- admin actions ----------
 
-  private async get(invoiceId: string) {
-    const invoice = await this.invoices.findOne({ where: { id: invoiceId } });
-    if (!invoice) throw new NotFoundException('Invoice not found');
-    return invoice;
-  }
-
   async markPaid(invoiceId: string, adminId: string, reference?: string) {
-    const invoice = await this.get(invoiceId);
-    if (invoice.status === InvoiceStatus.Void) {
-      throw new ConflictException('Invoice is void');
-    }
-    if (invoice.status === InvoiceStatus.Paid) return invoice;
-
-    // Credit first. It is idempotent on paymentRef, so if marking the invoice
-    // fails below and the admin retries, the wallet is never credited twice.
-    await this.wallets.topUp({
-      tenantId: invoice.tenantId,
-      credits: invoice.creditsUsed,
-      type: 'purchase',
-      paymentRef: `invoice-${invoice.id}`,
-      note: `Invoice paid (admin: ${adminId})`,
-    });
-
     return this.ds.transaction(async (m) => {
-      const locked = await m.findOneOrFail(Invoice, {
+      const locked = await m.findOne(Invoice, {
         where: { id: invoiceId },
         lock: { mode: 'pessimistic_write' },
       });
+      if (!locked) throw new NotFoundException('Invoice not found');
+      if (locked.status === InvoiceStatus.Void)
+        throw new ConflictException('Invoice is void');
       if (locked.status === InvoiceStatus.Open) {
+        await this.wallets.topUp(
+          {
+            tenantId: locked.tenantId,
+            credits: locked.creditsUsed,
+            type: 'purchase',
+            paymentRef: `invoice-${locked.id}`,
+            note: `Invoice paid (admin: ${adminId})`,
+          },
+          m,
+        );
         locked.status = InvoiceStatus.Paid;
         locked.paidAt = new Date();
         locked.paymentRef = reference ?? null;
@@ -272,17 +291,15 @@ export class InvoicesService {
   }
 
   async voidInvoice(invoiceId: string) {
-    const invoice = await this.get(invoiceId);
-    if (invoice.status === InvoiceStatus.Paid) {
-      throw new ConflictException('A paid invoice cannot be voided');
-    }
-    if (invoice.status === InvoiceStatus.Void) return invoice;
-
     return this.ds.transaction(async (m) => {
-      const locked = await m.findOneOrFail(Invoice, {
+      const locked = await m.findOne(Invoice, {
         where: { id: invoiceId },
         lock: { mode: 'pessimistic_write' },
       });
+      if (!locked) throw new NotFoundException('Invoice not found');
+      if (locked.status === InvoiceStatus.Paid)
+        throw new ConflictException('A paid invoice cannot be voided');
+      if (locked.status === InvoiceStatus.Void) return locked;
       locked.status = InvoiceStatus.Void;
       await m.save(locked);
       await this.releaseInvoiceBlock(m, locked.tenantId);
@@ -292,14 +309,20 @@ export class InvoicesService {
 
   /** Set the price on one open invoice (useful when the tenant had no price at issue time). */
   async setPrice(invoiceId: string, pricePerCredit: number, currency: string) {
-    const invoice = await this.get(invoiceId);
-    if (invoice.status !== InvoiceStatus.Open) {
-      throw new ConflictException('Only open invoices can be re-priced');
-    }
-    invoice.pricePerCredit = pricePerCredit;
-    invoice.currency = currency;
-    invoice.amount = round2(invoice.creditsUsed * pricePerCredit);
-    return this.invoices.save(invoice);
+    return this.ds.transaction(async (m) => {
+      const invoice = await m.findOne(Invoice, {
+        where: { id: invoiceId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!invoice) throw new NotFoundException('Invoice not found');
+      if (invoice.status !== InvoiceStatus.Open) {
+        throw new ConflictException('Only open invoices can be re-priced');
+      }
+      invoice.pricePerCredit = pricePerCredit;
+      invoice.currency = currency;
+      invoice.amount = round2(invoice.creditsUsed * pricePerCredit);
+      return m.save(invoice);
+    });
   }
 
   // ---------- reads ----------

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { type Queue } from 'bullmq';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { Call } from '../../database/entities/call.entity';
 import { Tenant } from '../../tenants/tenant.entity';
@@ -22,6 +24,7 @@ export class RetellWebhookService {
     private readonly events: Repository<WebhookEvent>,
     @InjectRepository(Call) private readonly calls: Repository<Call>,
     @InjectRepository(Tenant) private readonly tenants: Repository<Tenant>,
+    @InjectQueue('retell-events') private readonly billingQueue: Queue,
   ) {}
 
   async ingest(event: string, call: any): Promise<void> {
@@ -77,6 +80,20 @@ export class RetellWebhookService {
       }
 
       await this.calls.upsert(values, ['retellCallId']);
+      if (event === 'call_ended' || event === 'call_analyzed') {
+        // Do not acknowledge the webhook until billing is durably queued.
+        // A failed enqueue leaves the event retryable by the provider.
+        await this.billingQueue.add(
+          event,
+          { call, tenantId, externalEventId },
+          {
+            jobId: `retell-${row.id}`,
+            attempts: 5,
+            backoff: { type: 'exponential', delay: 2000 },
+            removeOnComplete: 1000,
+          },
+        );
+      }
       await this.markProcessed(row.id, tenantId);
     } catch (err) {
       await this.markFailed(row.id, (err as Error).message);

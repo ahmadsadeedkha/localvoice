@@ -10,6 +10,8 @@ import { Request } from 'express';
 import Retell from 'retell-sdk';
 import { CallsService } from './calls.service';
 import { CallContext } from './call-context.types';
+import { TenantsService } from '../tenants/tenants.service';
+import { TenantStatus } from '../tenants/tenant.entity';
 
 /**
  * 1. Verifies the request really came from Retell (signature over the RAW body).
@@ -18,7 +20,10 @@ import { CallContext } from './call-context.types';
  */
 @Injectable()
 export class CallContextGuard implements CanActivate {
-  constructor(private readonly calls: CallsService) {}
+  constructor(
+    private readonly calls: CallsService,
+    private readonly tenants: TenantsService,
+  ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest<RawBodyRequest<Request>>();
@@ -47,6 +52,10 @@ export class CallContextGuard implements CanActivate {
     const call = await this.calls.findByRetellCallId(retellCallId);
     if (!call || call.status !== 'in_progress') {
       throw new ForbiddenException('Unknown or finished call');
+    }
+    const tenant = await this.tenants.findById(call.tenantId);
+    if (!tenant || tenant.status === TenantStatus.Suspended) {
+      throw new ForbiddenException('Tenant unavailable');
     }
 
     const context: CallContext = {

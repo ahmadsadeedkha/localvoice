@@ -14,7 +14,6 @@ import {
   type CreateEventJobData,
   SWEEP_PENDING_JOB,
   UPDATE_EVENT_JOB,
-  updateEventJobId,
 } from './calendar-sync.constants';
 import { CalendarSyncService } from './calendar-sync.service';
 
@@ -44,12 +43,13 @@ export class CalendarSyncProcessor extends WorkerHost {
       case SWEEP_PENDING_JOB: {
         const unsynced = await this.sync.findUnsynced();
         for (const data of unsynced) {
+          const name = data.status === 'cancelled' ? CANCEL_EVENT_JOB : UPDATE_EVENT_JOB;
           // update-event handles both cases: no event yet (creates it) or an
           // event at an old time (moves it). Fresh id, so it's never deduped
           // against an older completed job for the same booking.
-          await this.queue.add(UPDATE_EVENT_JOB, data, {
+          await this.queue.add(name, data, {
             ...CREATE_EVENT_JOB_OPTS,
-            jobId: updateEventJobId(data.bookingId),
+            jobId: `${name}-${data.bookingId}-${Date.now()}`,
           });
         }
         if (unsynced.length)
@@ -72,7 +72,7 @@ export class CalendarSyncProcessor extends WorkerHost {
 
     const { tenantId, bookingId } = job.data as SyncJobData;
     if (job.name === CANCEL_EVENT_JOB) {
-      // The booking is cancelled either way; only the Google event is left behind.
+      // Keep deletion pending so the sweep retries it after an outage.
       this.log.error(
         `Could not remove Google event for cancelled booking ${bookingId}: ${err.message}`,
       );
