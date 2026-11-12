@@ -8,6 +8,7 @@ import { ToolsController } from './tools.controller';
 import { ToolsService } from './tools.service';
 import { BookingModule } from '../booking/booking.module';
 import { MessagesModule } from '../messages/messages.module';
+import { TenantsModule } from '../tenants/tenant.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { MessagesModule } from '../messages/messages.module';
     BookingModule,
     CallsModule,
     MessagesModule,
+    TenantsModule,
   ],
   controllers: [ToolsController],
   providers: [ToolsService],
