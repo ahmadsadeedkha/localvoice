@@ -1,11 +1,18 @@
 import { DataSource } from 'typeorm';
 import { TenantWallet } from './tenant-wallet.entity';
 import { CreditLedger } from './credit-ledger.entity';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 
 export type CallGate =
   | { allowed: true; maxDurationMs: number }
   | { allowed: false; reason: 'no_balance' | 'invoice_unpaid' | 'no_wallet' };
+
+export type TopUpType = 'purchase' | 'grant' | 'adjustment';
 
 @Injectable()
 export class WalletService {
@@ -106,5 +113,83 @@ export class WalletService {
       );
     }
     return gate;
+  }
+
+  async getWallet(tenantId: string) {
+    return this.ds.getRepository(TenantWallet).findOne({ where: { tenantId } });
+  }
+
+  async topUp(p: {
+    tenantId: string;
+    credits: number;
+    type?: TopUpType;
+    paymentRef?: string; // gateway transaction id; required for 'purchase'
+    note?: string;
+  }) {
+    if (!Number.isFinite(p.credits) || p.credits <= 0) {
+      throw new BadRequestException('credits must be a positive number');
+    }
+    const type = p.type ?? 'adjustment';
+    if (type === 'purchase' && !p.paymentRef) {
+      throw new BadRequestException('purchase requires a paymentRef');
+    }
+
+    return this.ds.transaction(async (m) => {
+      const tenant = await m.query(`SELECT 1 FROM tenants WHERE id = $1`, [
+        p.tenantId,
+      ]);
+      if (tenant.length === 0) throw new BadRequestException('Unknown tenant');
+
+      // create the wallet if this tenant never got one
+      await m.query(
+        `INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT DO NOTHING`,
+        [p.tenantId],
+      );
+
+      const wallet = await m.findOneOrFail(TenantWallet, {
+        where: { tenantId: p.tenantId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      // the same payment can't credit twice (gateway webhooks retry)
+      if (p.paymentRef) {
+        const dup = await m.exists(CreditLedger, {
+          where: { type, paymentRef: p.paymentRef },
+        });
+        if (dup) {
+          return { credited: false as const, balance: wallet.balanceCredits };
+        }
+      }
+
+      const before = wallet.balanceCredits;
+      const after = +(before + p.credits).toFixed(2);
+
+      await m.insert(CreditLedger, {
+        tenantId: p.tenantId,
+        type,
+        credits: p.credits,
+        balanceAfter: after,
+        paymentRef: p.paymentRef ?? null,
+        note: p.note ?? null,
+      });
+
+      wallet.balanceCredits = after;
+
+      // re-arm the low-balance alert once the tenant is back above the threshold
+      if (after > wallet.lowBalanceThreshold)
+        wallet.lowBalanceNotifiedAt = null;
+
+      // lift a no-balance block once they can spend again;
+      // 'invoice_unpaid' stays until the invoice is actually paid
+      if (
+        wallet.blockedReason === 'no_balance' &&
+        after > -wallet.creditLimit
+      ) {
+        wallet.blockedReason = null;
+      }
+
+      await m.save(wallet);
+      return { credited: true as const, before, after };
+    });
   }
 }
