@@ -16,9 +16,11 @@ import { CreditLedger } from './credit-ledger.entity';
 import { Invoice } from './invoice.entity';
 import { WebhookEvent } from '../webhooks/webhook-event.entity';
 import { Tenant } from '../tenants/tenant.entity';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule,
     TypeOrmModule.forFeature([
       TenantWallet,
       CreditLedger,

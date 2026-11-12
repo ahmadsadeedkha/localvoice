@@ -1,7 +1,12 @@
-import { InvoicesService, monthStartUtc } from './invoices.service';
+import {
+  InvoicesService,
+  monthStartUtc,
+  toInvoiceDto,
+} from './invoices.service';
 import { Invoice, InvoiceStatus } from './invoice.entity';
 import { WalletService } from './wallet.service';
 import { BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 function setup() {
   let state: any = {
@@ -10,8 +15,14 @@ function setup() {
       tenantId: 'tenant-1',
       status: InvoiceStatus.Open,
       creditsUsed: 10,
+      pricePerCredit: 1,
+      currency: 'USD',
+      amount: 10,
     },
     wallet: {
+      billingMode: 'postpaid',
+      tenantId: 'tenant-1',
+      invoiceDueDays: 7,
       balanceCredits: -10,
       creditLimit: 100,
       blockedReason: null,
@@ -46,6 +57,12 @@ function setup() {
     },
   };
   let tail = Promise.resolve();
+  const billingSettings: any = {
+    billingMode: 'postpaid',
+    pricePerCredit: 1,
+    currency: 'USD',
+    invoiceDueDays: 7,
+  };
   const ds = {
     transaction: (fn: any) => {
       const result = tail.then(async () => {
@@ -64,29 +81,34 @@ function setup() {
       return result;
     },
     getRepository: () => ({
-      findOne: async () => ({
-        billingMode: 'postpaid',
-        pricePerCredit: 1,
-        invoiceDueDays: 7,
-      }),
+      findOne: async () => billingSettings,
+      find: async () =>
+        state.wallet.blockedReason === 'invoice_unpaid' ? [state.wallet] : [],
     }),
     query: jest.fn().mockResolvedValue([{ used: '10' }]),
   };
   let generated: any = null;
   const repo = {
+    find: jest.fn().mockResolvedValue([]),
+    update: jest.fn(),
     findOne: async () => generated,
     create: (p: any) => p,
     save: async (p: any) => (generated = p),
   };
-  const wallets = new WalletService(ds as any);
+  const wallets = new WalletService(ds as any, new ConfigService());
+  const notifications = { add: jest.fn() };
   const service = new InvoicesService(
     ds as any,
     wallets,
     repo as any,
-    {} as any,
+    notifications as any,
   );
   return {
     service,
+    wallets,
+    billingSettings,
+    repo,
+    notifications,
     m,
     ds,
     state: () => state,
@@ -157,6 +179,17 @@ describe('atomic invoice transitions', () => {
 });
 
 describe('invoice periods', () => {
+  it('refuses to issue an unpriced invoice', async () => {
+    const s = setup();
+    s.billingSettings.pricePerCredit = null;
+    const now = new Date();
+    await expect(
+      s.service.generateForTenant(
+        'tenant-1',
+        monthStartUtc(now.getUTCFullYear(), now.getUTCMonth()),
+      ),
+    ).rejects.toThrow('Set a positive price and currency');
+  });
   it('rejects current and future months before storing a final invoice', async () => {
     const s = setup();
     const now = new Date();
@@ -181,5 +214,93 @@ describe('invoice periods', () => {
     await expect(
       s.service.generateForTenant('tenant-1', period),
     ).resolves.toMatchObject({ created: false });
+  });
+});
+
+describe('legacy unpriced invoices and credit policy', () => {
+  it('sends the one-day reminder directly for short payment terms', async () => {
+    const s = setup();
+    const invoice = s.state().invoice;
+    Object.assign(invoice, {
+      dueAt: new Date(Date.now() + 12 * 3600000),
+      reminder1dSentAt: null,
+      reminder3dSentAt: null,
+    });
+    s.repo.find.mockResolvedValueOnce([invoice]);
+    await s.service.runDailyChecks();
+    expect(s.notifications.add).toHaveBeenCalledWith(
+      'invoice-reminder',
+      expect.objectContaining({ daysLeft: 1 }),
+    );
+    expect(invoice.reminder1dSentAt).toBeInstanceOf(Date);
+    expect(invoice.reminder3dSentAt).toBeInstanceOf(Date);
+  });
+  it('does not accept payment against an invoice without an amount', async () => {
+    const s = setup();
+    s.state().invoice.amount = null;
+    await expect(s.service.markPaid('invoice-1', 'admin')).rejects.toThrow(
+      'Price this invoice',
+    );
+    expect(s.state().ledger).toHaveLength(0);
+  });
+
+  it('shows an unpriced invoice as needing pricing, not overdue', () => {
+    expect(
+      toInvoiceDto({
+        amount: null,
+        pricePerCredit: null,
+        currency: null,
+        status: InvoiceStatus.Open,
+        dueAt: new Date(0),
+      } as any),
+    ).toMatchObject({ needsPricing: true, overdue: false });
+  });
+
+  it('starts a fresh payment window after a legacy invoice is priced', async () => {
+    const s = setup();
+    Object.assign(s.state().invoice, {
+      amount: null,
+      pricePerCredit: null,
+      dueAt: new Date(0),
+    });
+    const before = Date.now();
+    const invoice = await s.service.setPrice('invoice-1', 2, 'USD');
+    expect(invoice.amount).toBe(20);
+    expect(invoice.dueAt.getTime()).toBeGreaterThanOrEqual(
+      before + 7 * 86400000,
+    );
+    expect(invoice.reminder1dSentAt).toBeNull();
+  });
+
+  it('clears stale invoice holds when no priced overdue invoice remains', async () => {
+    const s = setup();
+    s.state().wallet.blockedReason = 'invoice_unpaid';
+    await s.service.runDailyChecks();
+    expect(s.state().wallet.blockedReason).toBeNull();
+    expect(s.repo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          amount: expect.anything(),
+          pricePerCredit: expect.anything(),
+          currency: expect.anything(),
+        }),
+      }),
+    );
+  });
+
+  it('preserves a promotional grant when the full invoice is paid', async () => {
+    const s = setup();
+    await s.wallets.topUp({
+      tenantId: 'tenant-1',
+      credits: 3,
+      type: 'grant',
+      note: 'Promotion',
+    });
+    await s.service.markPaid('invoice-1', 'admin');
+    expect(s.state().wallet.balanceCredits).toBe(3);
+    expect(s.state().ledger.map((e: any) => e.type)).toEqual([
+      'grant',
+      'purchase',
+    ]);
   });
 });

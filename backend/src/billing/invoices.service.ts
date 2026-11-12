@@ -13,6 +13,9 @@ import {
   DataSource,
   EntityManager,
   LessThanOrEqual,
+  MoreThan,
+  Not,
+  IsNull,
   Repository,
 } from 'typeorm';
 import { Invoice, InvoiceStatus } from './invoice.entity';
@@ -21,6 +24,19 @@ import { WalletService } from './wallet.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const round2 = (n: number) => Math.round(n * 100) / 100;
+const priced = (i: Pick<Invoice, 'pricePerCredit' | 'amount' | 'currency'>) =>
+  i.pricePerCredit != null &&
+  Number.isFinite(i.pricePerCredit) &&
+  i.pricePerCredit > 0 &&
+  i.amount != null &&
+  Number.isFinite(i.amount) &&
+  i.amount > 0 &&
+  !!i.currency?.match(/^[A-Z]{3}$/);
+const payable = () => ({
+  pricePerCredit: MoreThan(0),
+  amount: MoreThan(0),
+  currency: Not(IsNull()),
+});
 
 // Billing months are UTC calendar months.
 export const monthStartUtc = (year: number, month1to12: number) =>
@@ -41,7 +57,11 @@ export const toInvoiceDto = (i: Invoice) => ({
   issuedAt: i.issuedAt,
   dueAt: i.dueAt,
   paidAt: i.paidAt,
-  overdue: i.status === InvoiceStatus.Open && i.dueAt.getTime() <= Date.now(),
+  needsPricing: !priced(i),
+  overdue:
+    priced(i) &&
+    i.status === InvoiceStatus.Open &&
+    i.dueAt.getTime() <= Date.now(),
 });
 
 @Injectable()
@@ -99,6 +119,12 @@ export class InvoicesService {
 
     const issuedAt = new Date();
     const rate = wallet.pricePerCredit;
+    const amount = rate != null ? round2(used * rate) : null;
+    if (!priced({ pricePerCredit: rate, amount, currency: wallet.currency })) {
+      throw new ConflictException(
+        'Set a positive price and currency before issuing this invoice',
+      );
+    }
     try {
       const invoice = await this.invoices.save(
         this.invoices.create({
@@ -108,7 +134,7 @@ export class InvoicesService {
           creditsUsed: used,
           pricePerCredit: rate,
           currency: wallet.currency,
-          amount: rate != null ? round2(used * rate) : null,
+          amount,
           status: InvoiceStatus.Open,
           issuedAt,
           dueAt: new Date(issuedAt.getTime() + wallet.invoiceDueDays * DAY_MS),
@@ -168,6 +194,7 @@ export class InvoicesService {
     // 1) reminders for invoices falling due within 3 days
     const upcoming = await this.invoices.find({
       where: {
+        ...payable(),
         status: InvoiceStatus.Open,
         dueAt: Between(new Date(now.getTime() + 1), horizon),
       },
@@ -205,7 +232,11 @@ export class InvoicesService {
 
     // 2) block tenants that have an unpaid invoice past its due date
     const overdue = await this.invoices.find({
-      where: { status: InvoiceStatus.Open, dueAt: LessThanOrEqual(now) },
+      where: {
+        ...payable(),
+        status: InvoiceStatus.Open,
+        dueAt: LessThanOrEqual(now),
+      },
     });
     let blocked = 0;
     for (const tenantId of new Set(overdue.map((i) => i.tenantId))) {
@@ -213,6 +244,13 @@ export class InvoicesService {
         blocked++;
         await this.notifications.add('invoice-overdue-blocked', { tenantId });
       }
+    }
+    // Legacy unpriced invoices must not leave tenants on a stale billing hold.
+    const held = await this.ds
+      .getRepository(TenantWallet)
+      .find({ where: { blockedReason: 'invoice_unpaid' } });
+    for (const w of held) {
+      await this.ds.transaction((m) => this.releaseInvoiceBlock(m, w.tenantId));
     }
     return { reminded, blocked };
   }
@@ -226,6 +264,7 @@ export class InvoicesService {
       if (!w || w.blockedReason === 'invoice_unpaid') return false;
       const overdue = await m.count(Invoice, {
         where: {
+          ...payable(),
           tenantId,
           status: InvoiceStatus.Open,
           dueAt: LessThanOrEqual(new Date()),
@@ -242,6 +281,7 @@ export class InvoicesService {
   private async releaseInvoiceBlock(m: EntityManager, tenantId: string) {
     const stillOverdue = await m.count(Invoice, {
       where: {
+        ...payable(),
         tenantId,
         status: InvoiceStatus.Open,
         dueAt: LessThanOrEqual(new Date()),
@@ -270,6 +310,10 @@ export class InvoicesService {
       if (locked.status === InvoiceStatus.Void)
         throw new ConflictException('Invoice is void');
       if (locked.status === InvoiceStatus.Open) {
+        if (!priced(locked))
+          throw new ConflictException(
+            'Price this invoice before recording payment',
+          );
         await this.wallets.topUp(
           {
             tenantId: locked.tenantId,
@@ -318,10 +362,28 @@ export class InvoicesService {
       if (invoice.status !== InvoiceStatus.Open) {
         throw new ConflictException('Only open invoices can be re-priced');
       }
+      const wasUnpriced = !priced(invoice);
       invoice.pricePerCredit = pricePerCredit;
       invoice.currency = currency;
       invoice.amount = round2(invoice.creditsUsed * pricePerCredit);
-      return m.save(invoice);
+      if (!priced(invoice))
+        throw new BadRequestException(
+          'Invoice needs a positive amount and currency',
+        );
+      if (wasUnpriced) {
+        const wallet = await m.findOne(TenantWallet, {
+          where: { tenantId: invoice.tenantId },
+        });
+        invoice.issuedAt = new Date();
+        invoice.dueAt = new Date(
+          invoice.issuedAt.getTime() + (wallet?.invoiceDueDays ?? 7) * DAY_MS,
+        );
+        invoice.reminder1dSentAt = null;
+        invoice.reminder3dSentAt = null;
+      }
+      await m.save(invoice);
+      await this.releaseInvoiceBlock(m, invoice.tenantId);
+      return invoice;
     });
   }
 

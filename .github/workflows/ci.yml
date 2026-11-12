@@ -53,6 +53,8 @@ jobs:
           cache: pnpm
           cache-dependency-path: backend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm format:check
       - run: pnpm build
       - run: pnpm migration:run
       - run: pnpm run --if-present test --passWithNoTests

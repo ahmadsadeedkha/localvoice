@@ -21,7 +21,8 @@ export class BillingSchedulerService implements OnModuleInit {
     );
     await this.queue.upsertJobScheduler(
       'daily-invoice-checks',
-      { pattern: '0 3 * * *', tz: 'UTC' },
+      // Hourly checks give one-day terms time to receive a reminder before due.
+      { pattern: '0 * * * *', tz: 'UTC' },
       { name: 'daily-invoice-checks', opts: jobOpts },
     );
   }

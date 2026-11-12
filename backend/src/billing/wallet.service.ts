@@ -2,6 +2,7 @@ import { DataSource, EntityManager } from 'typeorm';
 import { TenantWallet } from './tenant-wallet.entity';
 import { CreditLedger } from './credit-ledger.entity';
 import { Tenant, TenantStatus } from '../tenants/tenant.entity';
+import { ConfigService } from '@nestjs/config';
 import {
   BadRequestException,
   HttpException,
@@ -21,7 +22,10 @@ export type TopUpType = 'purchase' | 'grant' | 'adjustment';
 
 @Injectable()
 export class WalletService {
-  constructor(private ds: DataSource) {}
+  constructor(
+    private ds: DataSource,
+    private readonly config: ConfigService,
+  ) {}
 
   async chargeForCall(p: {
     tenantId: string;
@@ -93,9 +97,9 @@ export class WalletService {
       return { allowed: false, reason: 'invoice_unpaid' };
     }
 
-    const perMinute = Number(process.env.CREDITS_PER_MINUTE ?? 1);
-    const minMinutes = Number(process.env.MIN_CALL_MINUTES ?? 2);
-    const maxMinutes = Number(process.env.MAX_CALL_MINUTES ?? 30);
+    const perMinute = this.config.getOrThrow<number>('CREDITS_PER_MINUTE');
+    const minMinutes = this.config.getOrThrow<number>('MIN_CALL_MINUTES');
+    const maxMinutes = this.config.getOrThrow<number>('MAX_CALL_MINUTES');
 
     // balance + credit_limit = what the tenant may still spend
     // (limit is 0 for prepaid, so this covers both billing modes)

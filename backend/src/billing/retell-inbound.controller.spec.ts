@@ -6,6 +6,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import Retell from 'retell-sdk';
 import { WalletService } from './wallet.service';
 import { TenantStatus } from '../tenants/tenant.entity';
+import { ConfigService } from '@nestjs/config';
 
 it('allows provider inbound webhooks through session guards to signature verification', async () => {
   const reflector = new Reflector();
@@ -105,11 +106,14 @@ describe('inbound tenant routing', () => {
 });
 
 it('blocks suspended tenants from starting web calls even with a funded wallet', async () => {
-  const wallets = new WalletService({
-    getRepository: () => ({
-      findOne: async () => ({ status: TenantStatus.Suspended }),
-    }),
-  } as any);
+  const wallets = new WalletService(
+    {
+      getRepository: () => ({
+        findOne: async () => ({ status: TenantStatus.Suspended }),
+      }),
+    } as any,
+    new ConfigService(),
+  );
   await expect(wallets.assertCanStartCall('tenant-1')).rejects.toMatchObject({
     response: expect.objectContaining({ reason: 'tenant_suspended' }),
   });

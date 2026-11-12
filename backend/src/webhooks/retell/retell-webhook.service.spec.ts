@@ -1,6 +1,7 @@
 import { RetellWebhookService } from './retell-webhook.service';
 import { WebhookEventStatus } from '../webhook-event.entity';
 import { RetellEventsProcessor } from '../../billing/retell-events.processor';
+import { ConfigService } from '@nestjs/config';
 
 describe('Retell billing integration', () => {
   const tenantId = '12345678-1234-1234-1234-123456789abc';
@@ -37,6 +38,7 @@ describe('Retell billing integration', () => {
       call_id: 'call-1',
       metadata: { tenant_id: tenantId },
       duration_ms: 1000,
+      call_cost: { combined_cost: 12.4 },
     };
     await s.service.ingest('call_ended', call);
     expect(s.calls.upsert).toHaveBeenCalled();
@@ -50,10 +52,16 @@ describe('Retell billing integration', () => {
       s.tenants as any,
       s.events as any,
       {} as any,
+      new ConfigService({ CREDITS_PER_MINUTE: 2.5 }),
     );
     await processor.process({ name, data } as any);
     expect(wallets.chargeForCall).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId, callId: 'call-1' }),
+      expect.objectContaining({
+        tenantId,
+        callId: 'call-1',
+        credits: 2.5,
+        providerCostCents: 12,
+      }),
     );
     expect(s.events.update).toHaveBeenLastCalledWith(
       expect.objectContaining({ externalEventId: 'call_ended:call-1' }),
@@ -83,8 +91,19 @@ describe('Retell billing integration', () => {
       call_id: 'call-1',
       metadata: { tenant_id: tenantId },
       call_cost: { combined_cost: 12 },
+      call_analysis: {
+        call_summary: 'Customer booked a visit',
+        user_sentiment: 'Positive',
+      },
     });
     const [name, data] = s.queue.add.mock.calls[0];
+    expect(s.calls.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: 'Customer booked a visit',
+        sentiment: 'Positive',
+      }),
+      ['retellCallId'],
+    );
     const wallets = {
       chargeForCall: jest.fn(),
       backfillProviderCost: jest.fn(),
@@ -94,6 +113,7 @@ describe('Retell billing integration', () => {
       s.tenants as any,
       s.events as any,
       {} as any,
+      new ConfigService({ CREDITS_PER_MINUTE: 1 }),
     );
     await processor.process({ name, data } as any);
     expect(wallets.backfillProviderCost).toHaveBeenCalledWith('call-1', 12);
