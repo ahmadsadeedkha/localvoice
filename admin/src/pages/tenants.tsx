@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router";
 import { Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -95,35 +96,41 @@ export function TenantsPage() {
       key: "actions",
       header: "",
       className: "text-right",
-      cell: (t) =>
-        t.status === "suspended" ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={setStatus.isPending}
-            onClick={() => setStatus.mutate({ id: t.id, status: "active" })}
-          >
-            Reactivate
+      cell: (t) => (
+        <div className="flex justify-end gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link to={`/tenants/${t.id}/billing`}>Billing</Link>
           </Button>
-        ) : (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={setStatus.isPending}
-            onClick={() => {
-              // A confirm dialog is enough for V1; swap in a shadcn Dialog later
-              if (
-                window.confirm(
-                  `Suspend ${t.name}? Its members lose access on their next request.`,
-                )
-              ) {
-                setStatus.mutate({ id: t.id, status: "suspended" });
-              }
-            }}
-          >
-            Suspend
-          </Button>
-        ),
+          {t.status === "suspended" ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={setStatus.isPending}
+              onClick={() => setStatus.mutate({ id: t.id, status: "active" })}
+            >
+              Reactivate
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={setStatus.isPending}
+              onClick={() => {
+                // A confirm dialog is enough for V1; swap in a shadcn Dialog later
+                if (
+                  window.confirm(
+                    `Suspend ${t.name}? Its members lose access on their next request.`,
+                  )
+                ) {
+                  setStatus.mutate({ id: t.id, status: "suspended" });
+                }
+              }}
+            >
+              Suspend
+            </Button>
+          )}
+        </div>
+      ),
     },
   ];
 

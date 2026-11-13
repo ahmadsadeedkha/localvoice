@@ -66,6 +66,19 @@ function parseBody<S extends z.ZodType>(schema: S, body: unknown): z.infer<S> {
   return r.data;
 }
 
+// A tenant without a wallet row behaves as a fresh prepaid tenant.
+const emptyWalletDto = (tenantId: string) => ({
+  tenantId,
+  billingMode: 'prepaid' as const,
+  balanceCredits: 0,
+  creditLimit: 0,
+  lowBalanceThreshold: 10,
+  pricePerCredit: null,
+  currency: null,
+  invoiceDueDays: 7,
+  blockedReason: null,
+});
+
 const toWalletDto = (w: TenantWallet) => ({
   tenantId: w.tenantId,
   billingMode: w.billingMode,
@@ -91,6 +104,15 @@ export class AdminInvoicesController {
   @Get('billing/needs-pricing')
   async needsPricing() {
     return { items: await this.invoices.needsPricing() };
+  }
+
+  @Get('tenants/:id/billing')
+  async getBilling(@Param('id', ParseUUIDPipe) id: string) {
+    const { tenantName, wallet } = await this.settings.get(id);
+    return {
+      tenantName,
+      ...(wallet ? toWalletDto(wallet) : emptyWalletDto(id)),
+    };
   }
 
   @Patch('tenants/:id/billing')

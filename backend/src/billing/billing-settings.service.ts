@@ -23,6 +23,19 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 export class BillingSettingsService {
   constructor(private readonly ds: DataSource) {}
 
+  /** Read-only view for the admin UI. Null wallet means the tenant never had one. */
+  async get(tenantId: string) {
+    const rows: { name: string }[] = await this.ds.query(
+      `SELECT name FROM tenants WHERE id = $1`,
+      [tenantId],
+    );
+    if (rows.length === 0) throw new NotFoundException('Unknown tenant');
+    const wallet = await this.ds
+      .getRepository(TenantWallet)
+      .findOne({ where: { tenantId } });
+    return { tenantName: rows[0].name, wallet };
+  }
+
   async update(tenantId: string, patch: BillingSettingsPatch) {
     return this.ds.transaction(async (m) => {
       const tenant = await m.query(`SELECT 1 FROM tenants WHERE id = $1`, [

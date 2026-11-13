@@ -487,6 +487,15 @@ export class InvoicesService {
     ]);
     return {
       billingMode: wallet?.billingMode ?? 'prepaid',
+      wallet: {
+        balanceCredits: wallet?.balanceCredits ?? 0,
+        creditLimit: wallet?.creditLimit ?? 0,
+        lowBalanceThreshold: wallet?.lowBalanceThreshold ?? 10,
+        pricePerCredit: wallet?.pricePerCredit ?? null,
+        currency: wallet?.currency ?? null,
+        invoiceDueDays: wallet?.invoiceDueDays ?? 7,
+        blockedReason: wallet?.blockedReason ?? null,
+      },
       currentPeriod: { periodStart: start, periodEnd: end, creditsUsed },
       invoices: invoices.map(toInvoiceDto),
     };
