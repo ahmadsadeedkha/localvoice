@@ -73,3 +73,23 @@ export function formatBillingDate(iso: string): string {
     timeZone: "UTC",
   }).format(new Date(iso));
 }
+
+export type LedgerEntry = {
+  id: string;
+  type: string;
+  description: string;
+  credits: number;
+  balanceAfter: number;
+  createdAt: string;
+  call: {
+    id: string;
+    fromNumber: string | null;
+    durationMs: number | null;
+  } | null;
+};
+
+export type LedgerPage = {
+  items: LedgerEntry[];
+  total: number;
+  timezone: string;
+};

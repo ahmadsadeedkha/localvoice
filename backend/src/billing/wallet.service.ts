@@ -3,6 +3,7 @@ import { TenantWallet } from './tenant-wallet.entity';
 import { CreditLedger } from './credit-ledger.entity';
 import { Tenant, TenantStatus } from '../tenants/tenant.entity';
 import { ConfigService } from '@nestjs/config';
+import { type LedgerGroup, type LedgerRow } from './ledger.dto';
 import {
   BadRequestException,
   HttpException,
@@ -128,6 +129,51 @@ export class WalletService {
       );
     }
     return gate;
+  }
+
+  /** Newest first. Scoped by tenant in every query, including the call join. */
+  async listLedger(
+    tenantId: string,
+    p: { limit: number; offset: number; group?: LedgerGroup },
+  ): Promise<{ items: LedgerRow[]; total: number; timezone: string }> {
+    const groupSql =
+      p.group === 'calls'
+        ? `AND l.type = 'call_charge'`
+        : p.group === 'credits'
+          ? `AND l.type <> 'call_charge'`
+          : '';
+    const [items, counts, tz]: [
+      LedgerRow[],
+      { count: number }[],
+      { timezone: string }[],
+    ] = await Promise.all([
+      this.ds.query(
+        `SELECT l.id, l.type, l.credits, l.balance_after AS "balanceAfter",
+                l.note, l.payment_ref AS "paymentRef",
+                l.provider_cost_cents AS "providerCostCents",
+                l.call_id AS "callId", l.created_at AS "createdAt",
+                c.id AS "callRowId", c.from_number AS "fromNumber",
+                c.duration_ms AS "durationMs"
+           FROM credit_ledger l
+           LEFT JOIN calls c
+             ON c.tenant_id = l.tenant_id AND c.retell_call_id = l.call_id
+          WHERE l.tenant_id = $1 ${groupSql}
+          ORDER BY l.created_at DESC, l.id DESC
+          LIMIT $2 OFFSET $3`,
+        [tenantId, p.limit, p.offset],
+      ),
+      this.ds.query(
+        `SELECT COUNT(*)::int AS count FROM credit_ledger l
+          WHERE l.tenant_id = $1 ${groupSql}`,
+        [tenantId],
+      ),
+      this.ds.query(`SELECT timezone FROM tenants WHERE id = $1`, [tenantId]),
+    ]);
+    return {
+      items,
+      total: counts[0]?.count ?? 0,
+      timezone: tz[0]?.timezone ?? 'UTC',
+    };
   }
 
   async getWallet(tenantId: string) {

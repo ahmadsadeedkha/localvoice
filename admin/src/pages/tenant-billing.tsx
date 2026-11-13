@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +35,17 @@ import {
   blockedLabel,
   formatCredits,
   formatDate,
+  formatDateTime,
+  formatDuration,
   formatMoney,
   formatPeriod,
+  formatUsdCents,
   lastCompletedMonth,
+  ledgerTypeLabel,
+  type AdminLedgerEntry,
   type BillingMode,
   type Invoice,
+  type LedgerGroup,
   type TenantBilling,
 } from "@/lib/billing";
 import { cn } from "@/lib/utils";
@@ -103,6 +114,7 @@ export function TenantBillingPage() {
     queryClient.invalidateQueries({ queryKey: ["tenant-billing", id] });
     queryClient.invalidateQueries({ queryKey: ["tenant-invoices", id] });
     queryClient.invalidateQueries({ queryKey: ["needs-pricing"] });
+    queryClient.invalidateQueries({ queryKey: ["tenant-ledger", id] });
   };
 
   const [creditsOpen, setCreditsOpen] = useState(false);
@@ -308,6 +320,8 @@ export function TenantBillingPage() {
         }
       />
 
+      <LedgerSection tenantId={id} />
+
       <Dialog open={creditsOpen} onOpenChange={setCreditsOpen}>
         <DialogContent>
           {creditsOpen && (
@@ -382,6 +396,154 @@ function Stat({
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
+  );
+}
+
+// ---------- credit history ----------
+
+const LEDGER_PAGE_SIZE = 15;
+
+function LedgerSection({ tenantId }: { tenantId: string }) {
+  const api = useApi();
+  const [group, setGroup] = useState<LedgerGroup>("");
+  const [page, setPage] = useState(0);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["tenant-ledger", tenantId, group, page],
+    queryFn: () =>
+      api<{ items: AdminLedgerEntry[]; total: number }>(
+        `/admin/tenants/${tenantId}/ledger?limit=${LEDGER_PAGE_SIZE}&offset=${page * LEDGER_PAGE_SIZE}${group ? `&group=${group}` : ""}`,
+      ),
+    placeholderData: keepPreviousData,
+  });
+
+  const total = data?.total ?? 0;
+  const pages = Math.max(Math.ceil(total / LEDGER_PAGE_SIZE), 1);
+
+  const columns: Column<AdminLedgerEntry>[] = [
+    { key: "when", header: "When", cell: (e) => formatDateTime(e.createdAt) },
+    {
+      key: "type",
+      header: "Type",
+      cell: (e) => (
+        <Badge variant="outline">{ledgerTypeLabel[e.type] ?? e.type}</Badge>
+      ),
+    },
+    {
+      key: "credits",
+      header: "Credits",
+      className: "tabular-nums",
+      cell: (e) => (
+        <span className={e.credits > 0 ? "text-success" : undefined}>
+          {e.credits > 0 ? "+" : ""}
+          {formatCredits(e.credits)}
+        </span>
+      ),
+    },
+    {
+      key: "balance",
+      header: "Balance after",
+      className: "tabular-nums",
+      cell: (e) => formatCredits(e.balanceAfter),
+    },
+    {
+      key: "details",
+      header: "Details",
+      cell: (e) =>
+        e.type === "call_charge" ? (
+          <div>
+            <div>
+              {e.fromNumber ?? "Unknown caller"} ·{" "}
+              {formatDuration(e.durationMs)}
+            </div>
+            {e.callId && (
+              <div className="font-mono text-xs text-muted-foreground">
+                {e.callId}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div>{e.note ?? "—"}</div>
+            {e.paymentRef && (
+              <div className="font-mono text-xs text-muted-foreground">
+                {e.paymentRef}
+              </div>
+            )}
+          </div>
+        ),
+    },
+    {
+      key: "cost",
+      header: "Provider cost",
+      className: "tabular-nums",
+      cell: (e) => formatUsdCents(e.providerCostCents),
+    },
+  ];
+
+  return (
+    <>
+      <div className="mt-8 mb-3 flex items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold">Credit history</h2>
+        <select
+          aria-label="Filter credit history"
+          className={cn(selectClass, "w-auto")}
+          value={group}
+          onChange={(e) => {
+            setGroup(e.target.value as LedgerGroup);
+            setPage(0);
+          }}
+        >
+          <option value="">All activity</option>
+          <option value="calls">Calls only</option>
+          <option value="credits">Credit changes only</option>
+        </select>
+      </div>
+
+      {error ? (
+        <p className="text-sm text-destructive">{error.message}</p>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={data?.items ?? []}
+          getRowId={(e) => e.id}
+          loading={isLoading}
+          empty={
+            <EmptyState
+              icon={Receipt}
+              title="No activity yet"
+              description="Call charges, top-ups and grants appear here."
+            />
+          }
+        />
+      )}
+
+      {total > LEDGER_PAGE_SIZE && (
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Page {page + 1} of {pages} · {total} entries
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page + 1 >= pages}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import {
   AlertTriangle,
   CreditCard,
@@ -9,10 +10,14 @@ import {
 import { DataTable, type Column } from "@/components/data-table";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
+import { Pagination } from "@/components/pagination";
+import { PhoneNumber } from "@/components/phone-number";
 import { StatCard } from "@/components/stat-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, apiFetch } from "@/lib/api";
+import { formatDateTime, formatDuration } from "@/lib/format";
 import {
   formatBillingDate,
   formatCredits,
@@ -20,6 +25,8 @@ import {
   formatPeriod,
   type BillingOverview,
   type Invoice,
+  type LedgerEntry,
+  type LedgerPage,
 } from "@/lib/billing-types";
 
 function Notice({
@@ -112,7 +119,123 @@ async function load(): Promise<BillingOverview | "forbidden"> {
   }
 }
 
-async function BillingContent() {
+const HISTORY_PAGE_SIZE = 20;
+
+type HistoryGroup = "calls" | "credits" | undefined;
+
+const historyTabs: { group: HistoryGroup; label: string }[] = [
+  { group: undefined, label: "All" },
+  { group: "calls", label: "Calls" },
+  { group: "credits", label: "Top-ups & adjustments" },
+];
+
+function historyHref(group: HistoryGroup, page: number) {
+  const q = new URLSearchParams();
+  if (group) q.set("history", group);
+  if (page > 1) q.set("page", String(page));
+  const qs = q.toString();
+  return `/billing${qs ? `?${qs}` : ""}`;
+}
+
+async function CreditHistory({
+  searchParams,
+}: Pick<PageProps<"/billing">, "searchParams">) {
+  const sp = await searchParams;
+  const rawPage = Array.isArray(sp.page) ? sp.page[0] : sp.page;
+  const rawGroup = Array.isArray(sp.history) ? sp.history[0] : sp.history;
+  const group: HistoryGroup =
+    rawGroup === "calls" || rawGroup === "credits" ? rawGroup : undefined;
+  const page = Math.max(Number(rawPage) || 1, 1);
+
+  const data = await apiFetch<LedgerPage>(
+    `/billing/ledger?limit=${HISTORY_PAGE_SIZE}&offset=${(page - 1) * HISTORY_PAGE_SIZE}${group ? `&group=${group}` : ""}`,
+  );
+  const pages = Math.max(Math.ceil(data.total / HISTORY_PAGE_SIZE), 1);
+
+  const columns: Column<LedgerEntry>[] = [
+    {
+      key: "when",
+      header: "When",
+      cell: (e) => formatDateTime(e.createdAt, data.timezone),
+    },
+    {
+      key: "details",
+      header: "Details",
+      cell: (e) =>
+        e.call ? (
+          <Link
+            href={`/calls/${e.call.id}`}
+            className="font-medium hover:underline"
+          >
+            Call from <PhoneNumber value={e.call.fromNumber} />
+            <span className="text-muted-foreground">
+              {" "}
+              · {formatDuration(e.call.durationMs)}
+            </span>
+          </Link>
+        ) : (
+          <span className="font-medium">{e.description}</span>
+        ),
+    },
+    {
+      key: "credits",
+      header: "Credits",
+      className: "tabular-nums",
+      cell: (e) => (
+        <span className={e.credits > 0 ? "text-success" : undefined}>
+          {e.credits > 0 ? "+" : ""}
+          {formatCredits(e.credits)}
+        </span>
+      ),
+    },
+    {
+      key: "balance",
+      header: "Balance after",
+      className: "tabular-nums",
+      cell: (e) => formatCredits(e.balanceAfter),
+    },
+  ];
+
+  return (
+    <>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {historyTabs.map((t) => (
+          <Button
+            key={t.label}
+            asChild
+            size="sm"
+            variant={t.group === group ? "secondary" : "outline"}
+          >
+            <Link href={historyHref(t.group, 1)}>{t.label}</Link>
+          </Button>
+        ))}
+      </div>
+      <DataTable
+        columns={columns}
+        rows={data.items}
+        getRowId={(e) => e.id}
+        empty={
+          <EmptyState
+            icon={Wallet}
+            title="No activity yet"
+            description="Each call your agent answers, and every credit top-up, shows up here."
+          />
+        }
+      />
+      <Pagination
+        page={page}
+        pages={pages}
+        total={data.total}
+        noun="entries"
+        hrefFor={(n) => historyHref(group, n)}
+      />
+    </>
+  );
+}
+
+async function BillingContent({
+  searchParams,
+}: Pick<PageProps<"/billing">, "searchParams">) {
   const data = await load();
 
   if (data === "forbidden") {
@@ -216,6 +339,11 @@ async function BillingContent() {
           />
         }
       />
+      <h2 className="mt-10 mb-3 text-lg font-semibold">Credit history</h2>
+      <Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
+        <CreditHistory searchParams={searchParams} />
+      </Suspense>
+
       <p className="mt-3 text-xs text-muted-foreground">
         Billing months and due dates use UTC. To add credits or pay an invoice,
         contact support.
@@ -224,7 +352,7 @@ async function BillingContent() {
   );
 }
 
-export default function BillingPage() {
+export default function BillingPage({ searchParams }: PageProps<"/billing">) {
   return (
     <>
       <PageHeader
@@ -232,7 +360,7 @@ export default function BillingPage() {
         description="Your credits, usage and invoices."
       />
       <Suspense fallback={<Skeleton className="h-56 w-full rounded-xl" />}>
-        <BillingContent />
+        <BillingContent searchParams={searchParams} />
       </Suspense>
     </>
   );

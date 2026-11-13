@@ -2,15 +2,18 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
   HttpCode,
   Logger,
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
 } from '@nestjs/common';
 import { z } from 'zod';
 import { type Principal } from '../auth/auth.types';
 import { CurrentPrincipal, PlatformAdminOnly } from '../auth/decorators';
+import { parseLedgerQuery, toAdminLedgerDto } from './ledger.dto';
 import { WalletService } from './wallet.service';
 
 const topUpSchema = z.object({
@@ -54,5 +57,17 @@ export class AdminBillingController {
       `platform admin ${principal.userId} added ${credits} credits (${type}) to tenant ${id}`,
     );
     return result;
+  }
+
+  @Get(':id/ledger')
+  async ledger(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: unknown,
+  ) {
+    const { items, total } = await this.wallets.listLedger(
+      id,
+      parseLedgerQuery(query),
+    );
+    return { items: items.map(toAdminLedgerDto), total };
   }
 }

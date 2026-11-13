@@ -85,3 +85,51 @@ export function lastCompletedMonth() {
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
 }
+
+export type LedgerGroup = "" | "calls" | "credits";
+
+export type AdminLedgerEntry = {
+  id: string;
+  type: string;
+  credits: number;
+  balanceAfter: number;
+  note: string | null;
+  paymentRef: string | null;
+  providerCostCents: number | null;
+  callId: string | null;
+  fromNumber: string | null;
+  durationMs: number | null;
+  createdAt: string;
+};
+
+export const ledgerTypeLabel: Record<string, string> = {
+  call_charge: "Call",
+  purchase: "Purchase",
+  grant: "Grant",
+  adjustment: "Adjustment",
+  refund: "Refund",
+  expiry: "Expiry",
+};
+
+export function formatDateTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+/** 134000 -> "2:14". */
+export function formatDuration(ms: number | null): string {
+  if (ms == null) return "—";
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** Retell reports cost in US cents. */
+export function formatUsdCents(cents: number | null): string {
+  if (cents == null) return "—";
+  return `$${(cents / 100).toFixed(2)}`;
+}
