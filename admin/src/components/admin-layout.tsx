@@ -1,11 +1,14 @@
 import { NavLink, Outlet } from "react-router";
 import { UserButton } from "@clerk/react";
-import { Building2, ShieldCheck } from "lucide-react";
+import { Building2, Receipt, ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 // Add items here as pages arrive (calls, webhook events, admins)
-const nav = [{ to: "/tenants", label: "Tenants", icon: Building2 }];
+const nav = [
+  { to: "/tenants", label: "Tenants", icon: Building2 },
+  { to: "/billing", label: "Billing", icon: Receipt },
+];
 
 export function AdminLayout() {
   return (
@@ -44,7 +47,7 @@ export function AdminLayout() {
           <ThemeToggle />
           <UserButton />
         </header>
-        <main className="mx-auto w-full max-w-[1200px] p-6">
+        <main className="mx-auto w-full max-w-300 p-6">
           <Outlet />
         </main>
       </div>

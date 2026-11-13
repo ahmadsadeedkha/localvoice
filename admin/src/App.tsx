@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router";
 import { SignIn } from "@clerk/react";
 import { AdminLayout } from "@/components/admin-layout";
 import { RequirePlatformAdmin } from "@/components/require-platform-admin";
+import { BillingPage } from "@/pages/billing";
+import { TenantBillingPage } from "@/pages/tenant-billing";
 import { TenantsPage } from "@/pages/tenants";
 
 function SignInPage() {
@@ -20,6 +22,8 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route path="/" element={<Navigate to="/tenants" replace />} />
           <Route path="/tenants" element={<TenantsPage />} />
+          <Route path="/tenants/:id/billing" element={<TenantBillingPage />} />
+          <Route path="/billing" element={<BillingPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

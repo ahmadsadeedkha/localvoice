@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Phone,
   Plug,
+  Receipt,
   Settings,
   Users,
   MessageSquare,
@@ -22,5 +23,6 @@ export const navItems: NavItem[] = [
   { href: "/services", label: "Services & hours", icon: Settings },
   //{ href: "/agent", label: "AI agent", icon: Bot },
   { href: "/integrations", label: "Integrations", icon: Plug },
+  { href: "/billing", label: "Billing", icon: Receipt },
   //{ href: "/team", label: "Team", icon: UsersRound },
 ];
