@@ -29,6 +29,7 @@ const settingsSchema = z.strictObject({
   currency: z
     .string()
     .trim()
+    .regex(/^[A-Za-z]{3}$/)
     .length(3)
     .transform((s) => s.toUpperCase())
     .nullable()
@@ -50,6 +51,7 @@ const priceSchema = z.object({
   currency: z
     .string()
     .trim()
+    .regex(/^[A-Za-z]{3}$/)
     .length(3)
     .transform((s) => s.toUpperCase()),
 });
@@ -85,6 +87,11 @@ export class AdminInvoicesController {
     private readonly invoices: InvoicesService,
     private readonly settings: BillingSettingsService,
   ) {}
+
+  @Get('billing/needs-pricing')
+  async needsPricing() {
+    return { items: await this.invoices.needsPricing() };
+  }
 
   @Patch('tenants/:id/billing')
   async updateBilling(
@@ -122,10 +129,12 @@ export class AdminInvoicesController {
       return {
         created: false,
         invoice: null,
-        reason: 'Tenant is not postpaid, or had no usage in that month',
+        reason:
+          'Tenant is not postpaid, had no usage, or the total rounds to zero',
       };
     }
-    if (result.created) await this.invoices.notifyIssued(result.invoice);
+    if (result.invoice.issueNoticePending)
+      await this.invoices.notifyIssued(result.invoice);
     return { created: result.created, invoice: toInvoiceDto(result.invoice) };
   }
 

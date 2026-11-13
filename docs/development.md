@@ -1,5 +1,17 @@
 # Development
 
+## Billing recovery and notifications
+
+- Invoice totals that round to `0.00` are skipped; usage remains in the ledger, without automatic carry-forward to another month.
+- Missing pricing is a recoverable batch result, not a failing job. Platform admins can inspect `GET /admin/billing/needs-pricing` for uninvoiced closed months with missing/invalid pricing, update `PATCH /admin/tenants/:id/billing`, then generate the invoice using `POST /admin/tenants/:id/invoices`.
+- Pricing a legacy invoice preserves `issuedAt` and starts a fresh due window using its wallet's terms (default 7 days when unavailable). Issuance notice intent is persisted and retried by invoice checks if Redis is unavailable after commit.
+- `invoice-issued` and `invoice-needs-pricing` are queue messages. There is no email/SMS delivery worker yet; queued notices must not be represented as delivered email. The admin recovery API remains usable independently of notification delivery.
+- Hourly `invoice-checks` replaces the old `daily-invoice-checks` scheduler at startup. Failed billing jobs retain at most 1,000 entries for up to seven days, cleaned when BullMQ finalizes later jobs.
+- `ENABLE_DEV_CALLS` defaults to the string `false`; in production, dev routes return 404 unless explicitly enabled. `BLOCKED_FALLBACK_AGENT_ID` is optional, but must be nonempty when supplied. Both are validated at startup and read through ConfigService.
+- Run `pnpm format` and `pnpm format:check` in `backend`; CI checks all backend source/test TypeScript files.
+
+Run `pnpm migration:run` in `backend` before starting this version to add the invoice notice recovery column.
+
 ## Prerequisites
 
 - Node.js 24, pnpm

@@ -8,16 +8,16 @@ import { CallsQueryService } from './calls-query.service';
 import { CallsController } from './calls.controller';
 import { BillingModule } from '../billing/billing.module';
 import { TenantsModule } from '../tenants/tenant.module';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Call]), BillingModule, TenantsModule],
-  controllers: [
-    CallsController,
-    ...(process.env.NODE_ENV !== 'production' ||
-    process.env.ENABLE_DEV_CALLS === 'true'
-      ? [DevCallsController]
-      : []),
+  imports: [
+    TypeOrmModule.forFeature([Call]),
+    BillingModule,
+    TenantsModule,
+    ConfigModule,
   ],
+  controllers: [CallsController, DevCallsController],
   providers: [CallsService, CallsQueryService, CallContextGuard],
   exports: [CallsService, CallsQueryService, CallContextGuard],
 })

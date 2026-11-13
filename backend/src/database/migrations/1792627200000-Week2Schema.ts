@@ -43,7 +43,9 @@ export class Week2Schema1792627200000 implements MigrationInterface {
         close_time time NOT NULL,
         CHECK (close_time > open_time)
       )`);
-    await q.query(`CREATE INDEX idx_business_hours_tenant ON business_hours (tenant_id, day_of_week)`);
+    await q.query(
+      `CREATE INDEX idx_business_hours_tenant ON business_hours (tenant_id, day_of_week)`,
+    );
 
     // Empty until telephony exists; the phone path resolves tenant through this.
     await q.query(`
@@ -104,7 +106,9 @@ export class Week2Schema1792627200000 implements MigrationInterface {
           tstzrange(starts_at, ends_at) WITH &&
         ) WHERE (status IN ('held','confirmed'))
       )`);
-    await q.query(`CREATE INDEX idx_bookings_tenant_start ON bookings (tenant_id, starts_at)`);
+    await q.query(
+      `CREATE INDEX idx_bookings_tenant_start ON bookings (tenant_id, starts_at)`,
+    );
     await q.query(
       `CREATE INDEX idx_bookings_hold_expiry ON bookings (hold_expires_at) WHERE status = 'held'`,
     );
@@ -123,10 +127,14 @@ export class Week2Schema1792627200000 implements MigrationInterface {
         created_at timestamptz NOT NULL DEFAULT now(),
         FOREIGN KEY (tenant_id, call_id) REFERENCES calls (tenant_id, id)
       )`);
-    await q.query(`CREATE INDEX idx_messages_tenant_status ON messages (tenant_id, status, created_at DESC)`);
+    await q.query(
+      `CREATE INDEX idx_messages_tenant_status ON messages (tenant_id, status, created_at DESC)`,
+    );
 
     // Backfill: one default resource for tenants that already exist.
-    await q.query(`INSERT INTO resources (tenant_id, name) SELECT id, 'Default' FROM tenants`);
+    await q.query(
+      `INSERT INTO resources (tenant_id, name) SELECT id, 'Default' FROM tenants`,
+    );
   }
 
   public async down(q: QueryRunner): Promise<void> {

@@ -64,6 +64,8 @@ export class Invoice {
 
   @Column({ name: 'issued_at', type: 'timestamptz', default: () => 'now()' })
   issuedAt: Date;
+  @Column({ name: 'issue_notice_pending', type: 'boolean', default: false })
+  issueNoticePending: boolean;
 
   @Column({ name: 'due_at', type: 'timestamptz' }) dueAt: Date;
 

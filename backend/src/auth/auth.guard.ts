@@ -14,7 +14,6 @@ import { AuthedRequest } from './auth.types';
 import { IS_PUBLIC_KEY } from './decorators';
 import { PLATFORM_ADMIN_KEY } from './decorators';
 
-
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(

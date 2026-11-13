@@ -17,17 +17,15 @@ describe('booking retry', () => {
         entity === Booking
           ? bookingRepo
           : {
-              findOne: jest
-                .fn()
-                .mockResolvedValue(
-                  entity === Service
-                    ? {
-                        id: serviceId,
-                        name: 'Consultation',
-                        durationMinutes: 30,
-                      }
-                    : null,
-                ),
+              findOne: jest.fn().mockResolvedValue(
+                entity === Service
+                  ? {
+                      id: serviceId,
+                      name: 'Consultation',
+                      durationMinutes: 30,
+                    }
+                  : null,
+              ),
             },
       transaction: jest.fn(),
     };

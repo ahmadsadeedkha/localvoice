@@ -12,6 +12,8 @@ const schema = z
     PUBLIC_BASE_URL: z.url(),
     RETELL_API_KEY: z.string().min(1),
     RETELL_AGENT_ID: z.string().min(1),
+    BLOCKED_FALLBACK_AGENT_ID: z.string().trim().min(1).optional(),
+    ENABLE_DEV_CALLS: z.enum(['true', 'false']).default('false'),
     CREDITS_PER_MINUTE: z.coerce
       .number()
       .positive()

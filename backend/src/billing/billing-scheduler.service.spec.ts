@@ -1,14 +1,23 @@
 import { BillingSchedulerService } from './billing-scheduler.service';
 
-it('checks short-term invoice reminders hourly using the existing scheduler ID', async () => {
-  const queue = { upsertJobScheduler: jest.fn() };
+it('replaces the old scheduler with bounded hourly invoice checks', async () => {
+  const queue = {
+    upsertJobScheduler: jest.fn(),
+    removeJobScheduler: jest.fn(),
+  };
   await new BillingSchedulerService(queue as any).onModuleInit();
   expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
-    'daily-invoice-checks',
+    'invoice-checks',
     {
       pattern: '0 * * * *',
       tz: 'UTC',
     },
-    expect.objectContaining({ name: 'daily-invoice-checks' }),
+    expect.objectContaining({
+      name: 'invoice-checks',
+      opts: expect.objectContaining({
+        removeOnFail: { age: 604800, count: 1000 },
+      }),
+    }),
   );
+  expect(queue.removeJobScheduler).toHaveBeenCalledWith('daily-invoice-checks');
 });

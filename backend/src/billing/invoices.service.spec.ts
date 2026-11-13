@@ -18,6 +18,7 @@ function setup() {
       pricePerCredit: 1,
       currency: 'USD',
       amount: 10,
+      issuedAt: new Date('2025-01-01T00:00:00Z'),
     },
     wallet: {
       billingMode: 'postpaid',
@@ -270,6 +271,12 @@ describe('legacy unpriced invoices and credit policy', () => {
       before + 7 * 86400000,
     );
     expect(invoice.reminder1dSentAt).toBeNull();
+    expect(invoice.issuedAt.toISOString()).toBe('2025-01-01T00:00:00.000Z');
+    expect(s.notifications.add).toHaveBeenCalledWith(
+      'invoice-issued',
+      expect.objectContaining({ invoiceId: 'invoice-1', dueAt: invoice.dueAt }),
+      expect.anything(),
+    );
   });
 
   it('clears stale invoice holds when no priced overdue invoice remains', async () => {
@@ -302,5 +309,92 @@ describe('legacy unpriced invoices and credit policy', () => {
       'grant',
       'purchase',
     ]);
+  });
+});
+
+describe('invoice generation recovery', () => {
+  const now = new Date();
+  const period = monthStartUtc(now.getUTCFullYear(), now.getUTCMonth());
+  it('retries a pending issuance notice even when the invoice was created by the previous attempt', async () => {
+    const s = setup();
+    s.ds.query.mockResolvedValueOnce([{ tenant_id: 'tenant-1' }]);
+    s.notifications.add.mockRejectedValueOnce(new Error('Queue unavailable'));
+    await expect(s.service.generateForPeriod(period)).rejects.toThrow(
+      '1 tenant(s) failed',
+    );
+    s.ds.query.mockResolvedValueOnce([{ tenant_id: 'tenant-1' }]);
+    await expect(s.service.generateForPeriod(period)).resolves.toMatchObject({
+      created: 0,
+    });
+    expect(s.notifications.add).toHaveBeenCalledTimes(2);
+  });
+  it('skips usage that rounds to zero without inserting an invoice or failing the batch', async () => {
+    const s = setup();
+    s.billingSettings.pricePerCredit = 0.001;
+    s.ds.query
+      .mockResolvedValueOnce([{ tenant_id: 'tenant-1' }])
+      .mockResolvedValueOnce([{ used: '1' }]);
+    await expect(s.service.generateForPeriod(period)).resolves.toMatchObject({
+      created: 0,
+      needsPricing: 0,
+    });
+    s.billingSettings.pricePerCredit = 1;
+    await expect(
+      s.service.generateForTenant('tenant-1', period),
+    ).resolves.toMatchObject({ created: true });
+  });
+  it('queues an admin notice and completes normally when pricing is missing', async () => {
+    const s = setup();
+    s.billingSettings.pricePerCredit = null;
+    s.ds.query.mockResolvedValueOnce([{ tenant_id: 'tenant-1' }]);
+    await expect(s.service.generateForPeriod(period)).resolves.toMatchObject({
+      created: 0,
+      needsPricing: 1,
+    });
+    expect(s.notifications.add).toHaveBeenCalledWith(
+      'invoice-needs-pricing',
+      expect.objectContaining({ tenantIds: ['tenant-1'] }),
+      expect.anything(),
+    );
+  });
+  it('still fails for database errors', async () => {
+    const s = setup();
+    s.ds.query
+      .mockResolvedValueOnce([{ tenant_id: 'tenant-1' }])
+      .mockRejectedValueOnce(new Error('Database down'));
+    await expect(s.service.generateForPeriod(period)).rejects.toThrow(
+      '1 tenant(s) failed',
+    );
+  });
+  it('keeps notice intent after a post-commit queue outage and retries it without resetting dates', async () => {
+    const s = setup();
+    Object.assign(s.state().invoice, { amount: null, pricePerCredit: null });
+    s.notifications.add.mockRejectedValueOnce(new Error('Redis down'));
+    await expect(s.service.setPrice('invoice-1', 2, 'USD')).rejects.toThrow(
+      'Redis down',
+    );
+    expect(s.state().invoice.issueNoticePending).toBe(true);
+    const dueAt = s.state().invoice.dueAt;
+    await s.service.setPrice('invoice-1', 2, 'USD');
+    expect(s.state().invoice.dueAt).toEqual(dueAt);
+    expect(s.notifications.add).toHaveBeenCalledTimes(2);
+    expect(s.repo.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'invoice-1', dueAt }),
+      { issueNoticePending: false },
+    );
+  });
+  it('excludes lowercase currency from the DTO and overdue database predicate', async () => {
+    const s = setup();
+    expect(
+      toInvoiceDto({
+        ...s.state().invoice,
+        currency: 'usd',
+        dueAt: new Date(0),
+      }),
+    ).toMatchObject({ needsPricing: true, overdue: false });
+    await s.service.runDailyChecks();
+    const filter = s.repo.find.mock.calls[0][0].where.currency;
+    expect(filter.type).toBe('raw');
+    expect(filter.getSql('currency')).toBe("currency ~ '^[A-Z]{3}$'");
   });
 });

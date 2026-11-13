@@ -14,8 +14,7 @@ import {
   EntityManager,
   LessThanOrEqual,
   MoreThan,
-  Not,
-  IsNull,
+  Raw,
   Repository,
 } from 'typeorm';
 import { Invoice, InvoiceStatus } from './invoice.entity';
@@ -23,6 +22,12 @@ import { TenantWallet } from './tenant-wallet.entity';
 import { WalletService } from './wallet.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_INVOICE_DUE_DAYS = 7;
+export class InvoiceNeedsPricingError extends ConflictException {
+  constructor() {
+    super('Set a positive price and currency before issuing this invoice');
+  }
+}
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const priced = (i: Pick<Invoice, 'pricePerCredit' | 'amount' | 'currency'>) =>
   i.pricePerCredit != null &&
@@ -35,7 +40,7 @@ const priced = (i: Pick<Invoice, 'pricePerCredit' | 'amount' | 'currency'>) =>
 const payable = () => ({
   pricePerCredit: MoreThan(0),
   amount: MoreThan(0),
-  currency: Not(IsNull()),
+  currency: Raw((column) => `${column} ~ '^[A-Z]{3}$'`),
 });
 
 // Billing months are UTC calendar months.
@@ -119,11 +124,20 @@ export class InvoicesService {
 
     const issuedAt = new Date();
     const rate = wallet.pricePerCredit;
-    const amount = rate != null ? round2(used * rate) : null;
-    if (!priced({ pricePerCredit: rate, amount, currency: wallet.currency })) {
-      throw new ConflictException(
-        'Set a positive price and currency before issuing this invoice',
+    if (
+      rate == null ||
+      !Number.isFinite(rate) ||
+      rate <= 0 ||
+      !wallet.currency?.match(/^[A-Z]{3}$/)
+    ) {
+      throw new InvoiceNeedsPricingError();
+    }
+    const amount = round2(used * rate);
+    if (amount <= 0) {
+      this.log.warn(
+        `Tenant ${tenantId}: usage rounds to 0.00 for ${periodStart.toISOString().slice(0, 7)}; no invoice issued`,
       );
+      return null;
     }
     try {
       const invoice = await this.invoices.save(
@@ -137,6 +151,7 @@ export class InvoicesService {
           amount,
           status: InvoiceStatus.Open,
           issuedAt,
+          issueNoticePending: true,
           dueAt: new Date(issuedAt.getTime() + wallet.invoiceDueDays * DAY_MS),
         }),
       );
@@ -157,32 +172,64 @@ export class InvoicesService {
     );
     let created = 0;
     let failed = 0;
+    const needsPricing: string[] = [];
     for (const { tenant_id } of rows) {
       try {
         const r = await this.generateForTenant(tenant_id, periodStart);
         if (r?.created) {
           created++;
-          await this.notifyIssued(r.invoice);
         }
+        if (r?.invoice.issueNoticePending) await this.notifyIssued(r.invoice);
       } catch (e) {
+        if (e instanceof InvoiceNeedsPricingError) {
+          needsPricing.push(tenant_id);
+          this.log.warn(`Tenant ${tenant_id} needs pricing before invoicing`);
+          continue;
+        }
         failed++;
         this.log.error(
           `Invoice generation failed for tenant ${tenant_id}: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     }
-    // throwing makes BullMQ retry; already-created invoices are skipped on retry
+    if (needsPricing.length) {
+      await this.notifications.add(
+        'invoice-needs-pricing',
+        {
+          tenantIds: needsPricing,
+          period: periodStart.toISOString().slice(0, 7),
+        },
+        {
+          jobId: `invoice-needs-pricing-${periodStart.getTime()}`,
+          removeOnComplete: 100,
+          removeOnFail: { age: 7 * 86400, count: 1000 },
+        },
+      );
+    }
+    // Known pricing gaps are visible through the admin list; real failures retry.
     if (failed > 0)
       throw new Error(`${failed} tenant(s) failed invoice generation`);
-    return { tenants: rows.length, created };
+    return { tenants: rows.length, created, needsPricing: needsPricing.length };
   }
 
   async notifyIssued(invoice: Invoice) {
-    await this.notifications.add('invoice-issued', {
-      tenantId: invoice.tenantId,
-      invoiceId: invoice.id,
-      dueAt: invoice.dueAt,
-    });
+    await this.notifications.add(
+      'invoice-issued',
+      {
+        tenantId: invoice.tenantId,
+        invoiceId: invoice.id,
+        dueAt: invoice.dueAt,
+      },
+      {
+        jobId: `invoice-issued-${invoice.id}-${invoice.dueAt.getTime()}`,
+        removeOnComplete: 1000,
+        removeOnFail: { age: 7 * 86400, count: 1000 },
+      },
+    );
+    await this.invoices.update(
+      { id: invoice.id, dueAt: invoice.dueAt },
+      { issueNoticePending: false },
+    );
   }
 
   // ---------- daily reminders + blocking ----------
@@ -252,6 +299,14 @@ export class InvoicesService {
     for (const w of held) {
       await this.ds.transaction((m) => this.releaseInvoiceBlock(m, w.tenantId));
     }
+    const pending = await this.invoices.find({
+      where: {
+        ...payable(),
+        status: InvoiceStatus.Open,
+        issueNoticePending: true,
+      },
+    });
+    for (const invoice of pending) await this.notifyIssued(invoice);
     return { reminded, blocked };
   }
 
@@ -353,7 +408,7 @@ export class InvoicesService {
 
   /** Set the price on one open invoice (useful when the tenant had no price at issue time). */
   async setPrice(invoiceId: string, pricePerCredit: number, currency: string) {
-    return this.ds.transaction(async (m) => {
+    const result = await this.ds.transaction(async (m) => {
       const invoice = await m.findOne(Invoice, {
         where: { id: invoiceId },
         lock: { mode: 'pessimistic_write' },
@@ -374,10 +429,11 @@ export class InvoicesService {
         const wallet = await m.findOne(TenantWallet, {
           where: { tenantId: invoice.tenantId },
         });
-        invoice.issuedAt = new Date();
         invoice.dueAt = new Date(
-          invoice.issuedAt.getTime() + (wallet?.invoiceDueDays ?? 7) * DAY_MS,
+          Date.now() +
+            (wallet?.invoiceDueDays ?? DEFAULT_INVOICE_DUE_DAYS) * DAY_MS,
         );
+        invoice.issueNoticePending = true;
         invoice.reminder1dSentAt = null;
         invoice.reminder3dSentAt = null;
       }
@@ -385,6 +441,26 @@ export class InvoicesService {
       await this.releaseInvoiceBlock(m, invoice.tenantId);
       return invoice;
     });
+    if (result.issueNoticePending) await this.notifyIssued(result);
+    return result;
+  }
+
+  /** Persistent admin recovery list, independent of notification delivery. */
+  async needsPricing() {
+    return this.ds.query(`
+      SELECT w.tenant_id AS "tenantId", t.name AS "tenantName",
+             date_trunc('month', l.created_at AT TIME ZONE 'UTC') AS "periodStart",
+             -SUM(l.credits) AS "creditsUsed"
+      FROM tenant_wallets w JOIN tenants t ON t.id = w.tenant_id
+      JOIN credit_ledger l ON l.tenant_id = w.tenant_id AND l.type = 'call_charge'
+      WHERE w.billing_mode = 'postpaid'
+        AND (w.price_per_credit IS NULL OR w.price_per_credit <= 0
+             OR w.currency IS NULL OR w.currency !~ '^[A-Z]{3}$')
+        AND l.created_at < date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+        AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.tenant_id = w.tenant_id
+          AND i.period_start = date_trunc('month', l.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')
+      GROUP BY w.tenant_id, t.name, date_trunc('month', l.created_at AT TIME ZONE 'UTC')
+      ORDER BY "periodStart", "tenantName"`);
   }
 
   // ---------- reads ----------

@@ -230,7 +230,9 @@ export class BookingService {
       booked: true,
       booking_id: booking.id,
       service: service.name,
-      when: DateTime.fromJSDate(booking.startsAt, { zone: timezone }).toFormat(LABEL_FORMAT),
+      when: DateTime.fromJSDate(booking.startsAt, { zone: timezone }).toFormat(
+        LABEL_FORMAT,
+      ),
       duration_minutes: service.durationMinutes,
       customer_name: booking.customerName,
     };

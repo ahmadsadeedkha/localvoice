@@ -25,9 +25,10 @@ export class BillingJobsProcessor extends WorkerHost {
         );
         return result;
       }
-      case 'daily-invoice-checks': {
+      case 'daily-invoice-checks': // Drain jobs already queued before the rename.
+      case 'invoice-checks': {
         const result = await this.invoices.runDailyChecks();
-        this.log.log(`Daily invoice checks: ${JSON.stringify(result)}`);
+        this.log.log(`Invoice checks: ${JSON.stringify(result)}`);
         return result;
       }
       default:

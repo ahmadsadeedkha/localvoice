@@ -221,7 +221,9 @@ export class GoogleCalendarService {
   async availabilityConnection(tenantId: string) {
     const c = await this.repo.findOne({ where: { tenantId } });
     if (c?.status === 'revoked') {
-      throw new GoogleNotConnectedError('Reconnect Google Calendar before booking');
+      throw new GoogleNotConnectedError(
+        'Reconnect Google Calendar before booking',
+      );
     }
     return c?.calendarId ? c : null;
   }

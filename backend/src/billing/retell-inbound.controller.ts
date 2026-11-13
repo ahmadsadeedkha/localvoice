@@ -16,6 +16,7 @@ import Retell from 'retell-sdk';
 import { WalletService } from './wallet.service';
 import { Tenant, TenantStatus } from '../tenants/tenant.entity';
 import { Public } from '../auth/decorators';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('webhooks/retell-inbound')
 export class RetellInboundController {
@@ -24,6 +25,7 @@ export class RetellInboundController {
   constructor(
     private wallets: WalletService,
     @InjectRepository(Tenant) private tenants: Repository<Tenant>,
+    private readonly config: ConfigService,
   ) {}
 
   @Public()
@@ -76,7 +78,7 @@ export class RetellInboundController {
         this.log.log(
           `Blocked inbound call, tenant ${tenant.id}: ${gate.reason}`,
         );
-        const fallback = process.env.BLOCKED_FALLBACK_AGENT_ID;
+        const fallback = this.config.get<string>('BLOCKED_FALLBACK_AGENT_ID');
         if (fallback) {
           // no tenant_id in metadata, so this call is never charged to the tenant
           return {

@@ -10,6 +10,24 @@ const base = {
   CLERK_SECRET_KEY: 'test',
 };
 
+it('validates optional call controls before they can enable production routes', () => {
+  expect(validateEnv(base).ENABLE_DEV_CALLS).toBe('false');
+  expect(
+    validateEnv({
+      ...base,
+      ENABLE_DEV_CALLS: 'true',
+      BLOCKED_FALLBACK_AGENT_ID: 'agent-1',
+    }),
+  ).toMatchObject({
+    ENABLE_DEV_CALLS: 'true',
+    BLOCKED_FALLBACK_AGENT_ID: 'agent-1',
+  });
+  expect(() => validateEnv({ ...base, ENABLE_DEV_CALLS: 'yes' })).toThrow();
+  expect(() =>
+    validateEnv({ ...base, BLOCKED_FALLBACK_AGENT_ID: '' }),
+  ).toThrow();
+});
+
 it('supplies numeric billing defaults and parses configured rates', () => {
   expect(validateEnv(base)).toMatchObject({
     CREDITS_PER_MINUTE: 1,

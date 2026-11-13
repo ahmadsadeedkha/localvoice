@@ -1,10 +1,21 @@
-import { Body, Controller, Get, Header, Post } from '@nestjs/common';
+import {
+  Body,
+  CanActivate,
+  Controller,
+  Get,
+  Header,
+  Injectable,
+  NotFoundException,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { CallsService } from './calls.service';
 import { Public } from '../auth/decorators';
 import { WalletService } from '../billing/wallet.service';
 
 /**
- * DEV ONLY. Registered only outside production (see CallsModule).
+ * DEV ONLY. Disabled in production unless explicitly enabled in validated config.
  * Takes tenantId from the body purely for local testing; this must never exist in prod.
  */
 
@@ -89,10 +100,28 @@ const TEST_PAGE = `<!doctype html>
 </body>
 </html>`;
 
+@Injectable()
+export class DevCallsEnabledGuard implements CanActivate {
+  constructor(private readonly config: ConfigService) {}
+  canActivate() {
+    if (
+      this.config.getOrThrow<string>('NODE_ENV') === 'production' &&
+      this.config.getOrThrow<string>('ENABLE_DEV_CALLS') !== 'true'
+    ) {
+      throw new NotFoundException();
+    }
+    return true;
+  }
+}
+
 @Public()
+@UseGuards(DevCallsEnabledGuard)
 @Controller('dev/calls')
 export class DevCallsController {
-  constructor(private readonly calls: CallsService, private readonly wallets: WalletService) {}
+  constructor(
+    private readonly calls: CallsService,
+    private readonly wallets: WalletService,
+  ) {}
 
   @Get('test-page')
   @Header('Content-Type', 'text/html; charset=utf-8')

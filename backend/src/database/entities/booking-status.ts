@@ -1,10 +1,5 @@
 export type BookingStatus =
-  | 'held'
-  | 'confirmed'
-  | 'expired'
-  | 'cancelled'
-  | 'completed'
-  | 'no_show';
+  'held' | 'confirmed' | 'expired' | 'cancelled' | 'completed' | 'no_show';
 
 export type CalendarSyncStatus = 'pending' | 'synced' | 'failed';
 

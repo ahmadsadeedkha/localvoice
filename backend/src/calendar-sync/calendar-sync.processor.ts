@@ -43,7 +43,8 @@ export class CalendarSyncProcessor extends WorkerHost {
       case SWEEP_PENDING_JOB: {
         const unsynced = await this.sync.findUnsynced();
         for (const data of unsynced) {
-          const name = data.status === 'cancelled' ? CANCEL_EVENT_JOB : UPDATE_EVENT_JOB;
+          const name =
+            data.status === 'cancelled' ? CANCEL_EVENT_JOB : UPDATE_EVENT_JOB;
           // update-event handles both cases: no event yet (creates it) or an
           // event at an old time (moves it). Fresh id, so it's never deduped
           // against an older completed job for the same booking.

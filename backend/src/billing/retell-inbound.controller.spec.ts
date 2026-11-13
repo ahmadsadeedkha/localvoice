@@ -46,6 +46,7 @@ describe('inbound tenant routing', () => {
     const controller = new RetellInboundController(
       wallets as any,
       { createQueryBuilder: () => builder } as any,
+      new ConfigService(),
     );
     const invoke = (number: unknown = '+923001234567') =>
       controller.handle({ rawBody: Buffer.from('{}') } as any, 'signed', {
