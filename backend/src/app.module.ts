@@ -17,6 +17,7 @@ import { QueueModule } from './queue/queue.module';
 import { GoogleCalendarModule } from './integrations/google/google-calendar.module';
 import { CalendarSyncModule } from './calendar-sync/calendar-sync.module';
 import { BillingModule } from './billing/billing.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { BillingModule } from './billing/billing.module';
     GoogleCalendarModule,
     CalendarSyncModule,
     BillingModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
 })

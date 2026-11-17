@@ -39,6 +39,8 @@ const schema = z
           'DEFAULT_TIMEZONE must be a valid IANA timezone, e.g. Asia/Karachi',
       }),
     FRONTEND_URL: z.url().default('http://localhost:3000'),
+    STRIPE_SECRET_KEY: z.string().min(1),
+    STRIPE_WEBHOOK_SECRET: z.string().min(1),
     ALLOWED_ORIGINS: z
       .string()
       .default('http://localhost:3000,http://localhost:5173'),

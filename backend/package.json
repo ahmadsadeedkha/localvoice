@@ -45,6 +45,7 @@
     "reflect-metadata": "^0.2.2",
     "retell-sdk": "^6.2.10",
     "rxjs": "^7.8.1",
+    "stripe": "^23.1.0",
     "svix": "^2.8.0",
     "typeorm": "^1.1.2",
     "zod": "^4.6.6"
