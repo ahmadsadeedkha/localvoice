@@ -133,3 +133,27 @@ export function formatUsdCents(cents: number | null): string {
   if (cents == null) return "—";
   return `$${(cents / 100).toFixed(2)}`;
 }
+
+export type PricingMarginChange = {
+  id: string;
+  marginPerMinute: number;
+  changedBy: string;
+  note: string | null;
+  createdAt: string;
+};
+
+export type PricingSettings = {
+  marginPerMinute: number;
+  isDefault: boolean;
+  history: PricingMarginChange[];
+};
+
+/** Margin per minute: credits equal USD, and margins can have up to 4 decimals. */
+export function formatMargin(n: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(n);
+}
