@@ -53,4 +53,12 @@ export class Tenant {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
+
+  @Column({
+    name: 'stripe_customer_id',
+    type: 'varchar',
+    nullable: true,
+    unique: true,
+  })
+  stripeCustomerId!: string | null;
 }

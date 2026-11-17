@@ -28,6 +28,8 @@ import {
   type LedgerEntry,
   type LedgerPage,
 } from "@/lib/billing-types";
+import { BuyCreditsCard } from "@/components/billing/buy-credits-card";
+import { CheckoutReturnBanner } from "@/components/billing/checkout-return-banner";
 
 function Notice({
   tone,
@@ -249,6 +251,12 @@ async function BillingContent({
   }
 
   const { wallet, billingMode, currentPeriod, invoices } = data;
+  const sp = await searchParams;
+  const rawCheckout = Array.isArray(sp.checkout) ? sp.checkout[0] : sp.checkout;
+  const checkout =
+    rawCheckout === "success" || rawCheckout === "cancelled"
+      ? rawCheckout
+      : null;
   const postpaid = billingMode === "postpaid";
   const available = wallet.balanceCredits + wallet.creditLimit;
   // For postpaid the threshold is negative (e.g. 80% of the limit used),
@@ -261,6 +269,10 @@ async function BillingContent({
 
   return (
     <>
+      <CheckoutReturnBanner
+        initial={checkout}
+        balance={wallet.balanceCredits}
+      />
       {wallet.blockedReason === "invoice_unpaid" && (
         <Notice tone="danger">
           <strong>An invoice is overdue, so your phone agent is paused.</strong>{" "}
@@ -322,6 +334,12 @@ async function BillingContent({
         )}
       </div>
 
+      {!postpaid && (
+        <div className="mb-8">
+          <BuyCreditsCard />
+        </div>
+      )}
+
       <h2 className="mb-3 text-lg font-semibold">Invoices</h2>
       <DataTable
         columns={columns}
@@ -345,8 +363,7 @@ async function BillingContent({
       </Suspense>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Billing months and due dates use UTC. To add credits or pay an invoice,
-        contact support.
+        Billing months and due dates use UTC. Buy credits or pay an invoice.
       </p>
     </>
   );

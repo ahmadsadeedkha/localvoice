@@ -8,6 +8,8 @@ const base = {
   RETELL_AGENT_ID: 'agent',
   CLERK_PUBLISHABLE_KEY: 'test',
   CLERK_SECRET_KEY: 'test',
+  STRIPE_SECRET_KEY: 'test',
+  STRIPE_WEBHOOK_SECRET: 'test',
 };
 
 it('validates optional call controls before they can enable production routes', () => {
