@@ -17,6 +17,9 @@ import { Invoice } from './invoice.entity';
 import { WebhookEvent } from '../webhooks/webhook-event.entity';
 import { Tenant } from '../tenants/tenant.entity';
 import { ConfigModule } from '@nestjs/config';
+import { PricingMarginChange } from './pricing-margin-change.entity';
+import { AdminPricingController } from './admin-pricing.controller';
+import { PricingService } from './pricing.service';
 
 @Module({
   imports: [
@@ -27,6 +30,7 @@ import { ConfigModule } from '@nestjs/config';
       Invoice,
       WebhookEvent,
       Tenant,
+      PricingMarginChange,
     ]),
     BullModule.registerQueue(
       { name: 'retell-events' },
@@ -39,6 +43,7 @@ import { ConfigModule } from '@nestjs/config';
     AdminBillingController,
     AdminInvoicesController,
     BillingController,
+    AdminPricingController,
   ],
   providers: [
     RetellEventsProcessor,
@@ -47,7 +52,8 @@ import { ConfigModule } from '@nestjs/config';
     BillingSettingsService,
     InvoicesService,
     WalletService,
+    PricingService,
   ],
-  exports: [WalletService, InvoicesService],
+  exports: [WalletService, InvoicesService, PricingService],
 })
 export class BillingModule {}

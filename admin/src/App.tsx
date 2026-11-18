@@ -5,6 +5,7 @@ import { RequirePlatformAdmin } from "@/components/require-platform-admin";
 import { BillingPage } from "@/pages/billing";
 import { TenantBillingPage } from "@/pages/tenant-billing";
 import { TenantsPage } from "@/pages/tenants";
+import { PricingPage } from "@/pages/pricing";
 
 function SignInPage() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/tenants" element={<TenantsPage />} />
           <Route path="/tenants/:id/billing" element={<TenantBillingPage />} />
           <Route path="/billing" element={<BillingPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

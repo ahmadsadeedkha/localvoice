@@ -41,6 +41,7 @@ const schema = z
     FRONTEND_URL: z.url().default('http://localhost:3000'),
     STRIPE_SECRET_KEY: z.string().min(1),
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
+    DEFAULT_MARGIN_PER_MINUTE: z.coerce.number().min(0).max(100).default(0.1),
     ALLOWED_ORIGINS: z
       .string()
       .default('http://localhost:3000,http://localhost:5173'),

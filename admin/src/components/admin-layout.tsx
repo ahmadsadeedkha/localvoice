@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from "react-router";
 import { UserButton } from "@clerk/react";
-import { Building2, Receipt, ShieldCheck } from "lucide-react";
+import { Building2, Receipt, ShieldCheck, DollarSign } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const nav = [
   { to: "/tenants", label: "Tenants", icon: Building2 },
   { to: "/billing", label: "Billing", icon: Receipt },
+  { to: "/pricing", label: "Pricing", icon: DollarSign },
 ];
 
 export function AdminLayout() {
