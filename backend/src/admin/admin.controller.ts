@@ -24,7 +24,7 @@ const toDto = (t: Tenant) => ({
   slug: t.slug,
   status: t.status,
   industry: t.industry,
-  twilioNumber: t.twilioNumber,
+  telnyxNumber: t.telnyxNumber,
   createdAt: t.createdAt,
 });
 

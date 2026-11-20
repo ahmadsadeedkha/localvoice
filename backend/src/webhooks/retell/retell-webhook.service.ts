@@ -174,11 +174,19 @@ export class RetellWebhookService {
     }
 
     if (call.to_number) {
-      const byNumber = await this.tenants.findOne({
-        where: { twilioNumber: call.to_number },
-        select: { id: true },
-      });
-      if (byNumber) return byNumber.id;
+      const matches = await this.tenants
+        .createQueryBuilder('t')
+        .select('t.id', 'id')
+        .where(
+          `t.telnyxNumber = :n OR EXISTS (
+             SELECT 1 FROM phone_numbers p
+              WHERE p.tenant_id = t.id AND p.e164 = :n
+           )`,
+          { n: call.to_number },
+        )
+        .limit(2)
+        .getRawMany<{ id: string }>();
+      if (matches.length === 1) return matches[0].id;
     }
     return null;
   }

@@ -35,8 +35,8 @@ export class Tenant {
   businessPhone!: string | null;
 
   @Index({ unique: true })
-  @Column({ name: 'twilio_number', type: 'varchar', nullable: true })
-  twilioNumber!: string | null;
+  @Column({ name: 'telnyx_number', type: 'varchar', nullable: true })
+  telnyxNumber!: string | null;
 
   @Column({ name: 'retell_agent_id', type: 'varchar', nullable: true })
   retellAgentId!: string | null;

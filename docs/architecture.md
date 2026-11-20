@@ -3,7 +3,7 @@
 ## Overview
 
 ```
-Caller ──► Phone number (Twilio, planned) ──► Retell AI voice agent
+Caller ──► Phone number (Telnyx) ──► Retell AI voice agent
                                                  │
                          custom functions (HTTPS, signed)
                                                  ▼
@@ -104,7 +104,7 @@ All tenant-owned tables carry `tenant_id`. Child tables use composite foreign ke
 
 | Table            | Purpose | Key constraints |
 | ---------------- | ------- | --------------- |
-| `tenants`        | A business (= Clerk organization) | unique `slug`, `clerk_org_id`, `twilio_number`; status `trial`/`active`/`suspended` |
+| `tenants`        | A business (= Clerk organization) | unique `slug`, `clerk_org_id`, `telnyx_number`; status `trial`/`active`/`suspended` |
 | `tenant_members` | User ↔ tenant with role `owner`/`admin`/`staff` | unique `(tenant_id, clerk_user_id)` |
 | `phone_numbers`  | Numbers mapped to tenants | unique `e164` |
 | `services`       | Bookable services with duration | |
@@ -148,4 +148,4 @@ Customers are not a table: they are derived from calls and bookings grouped by n
 | Our DB is the booking source of truth; Google is synced in the background | The call never waits on Google writes; retries are safe |
 | Fail closed when Google can't be read | Offering an unverified slot risks double-booking a real job |
 | Independent `frontend` / `backend` / `admin` projects | Separate deploys and dependencies, no shared env |
-| Twilio/telephony deferred | Provider availability in Pakistan under review; web calls used for testing |
+| Telephony via Telnyx | SIP trunk into Retell; web calls still used for testing |

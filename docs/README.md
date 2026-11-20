@@ -30,7 +30,7 @@ localvoice/
 | Area              | Choice                                       |
 | ----------------- | -------------------------------------------- |
 | Voice agent       | Retell AI (single-prompt agent + custom functions) |
-| Telephony / SMS   | Twilio (planned; provider under review)      |
+| Telephony / SMS   | Telnyx (SIP trunk into Retell)      |
 | Backend           | NestJS 11, TypeScript, TypeORM, Zod, Luxon   |
 | Database          | PostgreSQL 16                                |
 | Queue             | Redis 7 + BullMQ                             |

@@ -84,10 +84,10 @@ Each project has its own `.env`; `.env.example` is the template. Never commit `.
 | `PORT` | no | Default `4000` |
 | `DATABASE_URL` | yes | Postgres connection string |
 | `REDIS_URL` | yes | Redis connection string |
-| `PUBLIC_BASE_URL` | yes | Public URL Retell/Twilio call back to |
+| `PUBLIC_BASE_URL` | yes | Public URL Retell/Telnyx/Stripe call back to |
 | `RETELL_API_KEY` | yes | Also used to verify Retell signatures |
 | `RETELL_AGENT_ID` | yes | Default agent |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | no | Telephony (not yet used) |
+| `TELNYX_API_KEY` | no | Telnyx API (call records, number provisioning; not yet used) |
 | `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | yes | Clerk API |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | no | Required to accept Clerk webhooks |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | Google OAuth client. Required for the Calendar integration |
