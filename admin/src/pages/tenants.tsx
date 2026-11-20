@@ -18,7 +18,7 @@ type Tenant = {
   slug: string;
   status: TenantStatus;
   industry: string | null;
-  twilioNumber: string | null;
+  telnyxNumber: string | null;
   createdAt: string;
 };
 
@@ -84,7 +84,7 @@ export function TenantsPage() {
       key: "number",
       header: "Phone number",
       cell: (t) => (
-        <span className="font-mono">{t.twilioNumber ?? "None"}</span>
+        <span className="font-mono">{t.telnyxNumber ?? "None"}</span>
       ),
     },
     {

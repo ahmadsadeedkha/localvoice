@@ -9,7 +9,7 @@ import {
 
 export enum WebhookProvider {
   Retell = 'retell',
-  Twilio = 'twilio',
+  Telnyx = 'telnyx',
   Google = 'google',
   Clerk = 'clerk',
 }

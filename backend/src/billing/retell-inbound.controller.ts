@@ -55,7 +55,7 @@ export class RetellInboundController {
         .createQueryBuilder('t')
         .select(['t.id', 't.status', 't.retellAgentId'])
         .where(
-          `t.twilioNumber = :number OR EXISTS (
+          `t.telnyxNumber = :number OR EXISTS (
           SELECT 1 FROM phone_numbers p WHERE p.tenant_id = t.id AND p.e164 = :number
         )`,
           { number },
