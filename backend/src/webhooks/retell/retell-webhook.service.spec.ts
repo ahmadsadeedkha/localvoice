@@ -125,33 +125,33 @@ describe('Retell billing integration', () => {
     expect(wallets.chargeForCall).not.toHaveBeenCalled();
   });
 
-    it('estimates and flags the charge when Retell sent no cost', async () => {
-      const s = setup();
-      await s.service.ingest('call_ended', {
-        call_id: 'call-2',
-        metadata: { tenant_id: tenantId },
-        duration_ms: 60000,
-      });
-      const [name, data] = s.queue.add.mock.calls[0];
-      const wallets = {
-        chargeForCall: jest.fn().mockResolvedValue({ charged: false }),
-      };
-      const processor = new RetellEventsProcessor(
-        wallets as any,
-        s.tenants as any,
-        s.events as any,
-        {} as any,
-        new ConfigService({ ESTIMATED_COST_PER_MINUTE: 0.15 }),
-        { getMarginPerMinute: jest.fn().mockResolvedValue(0.1) } as any,
-      );
-      await processor.process({ name, data } as any);
-      // 15 cents estimated cost + 10 cents margin
-      expect(wallets.chargeForCall).toHaveBeenCalledWith(
-        expect.objectContaining({
-          credits: 0.25,
-          providerCostCents: null,
-          note: expect.stringContaining('estimated'),
-        }),
-      );
+  it('estimates and flags the charge when Retell sent no cost', async () => {
+    const s = setup();
+    await s.service.ingest('call_ended', {
+      call_id: 'call-2',
+      metadata: { tenant_id: tenantId },
+      duration_ms: 60000,
     });
+    const [name, data] = s.queue.add.mock.calls[0];
+    const wallets = {
+      chargeForCall: jest.fn().mockResolvedValue({ charged: false }),
+    };
+    const processor = new RetellEventsProcessor(
+      wallets as any,
+      s.tenants as any,
+      s.events as any,
+      {} as any,
+      new ConfigService({ ESTIMATED_COST_PER_MINUTE: 0.15 }),
+      { getMarginPerMinute: jest.fn().mockResolvedValue(0.1) } as any,
+    );
+    await processor.process({ name, data } as any);
+    // 15 cents estimated cost + 10 cents margin
+    expect(wallets.chargeForCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        credits: 0.25,
+        providerCostCents: null,
+        note: expect.stringContaining('estimated'),
+      }),
+    );
+  });
 });
