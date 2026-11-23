@@ -232,7 +232,7 @@ export function TenantBillingPage() {
             <Button variant="outline" onClick={() => setGenerateOpen(true)}>
               Generate invoice
             </Button>
-            <Button onClick={() => setCreditsOpen(true)}>Add credits</Button>
+            <Button onClick={() => setCreditsOpen(true)}>Add funds</Button>
           </>
         }
       />
@@ -278,7 +278,6 @@ export function TenantBillingPage() {
               >
                 {formatCredits(w.balanceCredits)}
               </span>
-              <span className="text-xs text-muted-foreground"> credits</span>
             </Stat>
             <Stat label="Credit limit">
               <span className="text-2xl font-semibold tabular-nums">
@@ -479,14 +478,23 @@ function LedgerSection({ tenantId }: { tenantId: string }) {
       className: "tabular-nums",
       cell: (e) => formatUsdCents(e.providerCostCents),
     },
+    {
+      key: "profit",
+      header: "Profit",
+      className: "tabular-nums",
+      cell: (e) =>
+        e.type === "call_charge" && e.providerCostCents != null
+          ? formatMoney(-e.credits - e.providerCostCents / 100, "USD")
+          : "—",
+    },
   ];
 
   return (
     <>
       <div className="mt-8 mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Credit history</h2>
+        <h2 className="text-lg font-semibold">Transaction history</h2>
         <select
-          aria-label="Filter credit history"
+          aria-label="Filter balance history"
           className={cn(selectClass, "w-auto")}
           value={group}
           onChange={(e) => {
@@ -496,7 +504,7 @@ function LedgerSection({ tenantId }: { tenantId: string }) {
         >
           <option value="">All activity</option>
           <option value="calls">Calls only</option>
-          <option value="credits">Credit changes only</option>
+          <option value="credits">Top-ups & adjustments only</option>
         </select>
       </div>
 
@@ -752,7 +760,7 @@ function AddCreditsForm({
       </Field>
       <Field
         label="Type"
-        hint="Grant = promotional credits. Adjustment = correction."
+        hint="Grant = promotional funds. Adjustment = correction."
       >
         <select
           className={selectClass}
@@ -961,7 +969,7 @@ function PriceForm({
         </DialogTitle>
         <DialogDescription>
           {formatPeriod(invoice.periodStart)} ·{" "}
-          {formatCredits(invoice.creditsUsed)} credits.
+          {formatCredits(invoice.creditsUsed)} used.
           {invoice.needsPricing &&
             " Pricing restarts the payment window and notifies the business."}
         </DialogDescription>

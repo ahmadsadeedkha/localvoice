@@ -85,7 +85,7 @@ const columns: Column<Invoice>[] = [
   },
   {
     key: "credits",
-    header: "Credits used",
+    header: "Usage",
     className: "tabular-nums",
     cell: (i) => formatCredits(i.creditsUsed),
   },
@@ -181,7 +181,7 @@ async function CreditHistory({
     },
     {
       key: "credits",
-      header: "Credits",
+      header: "Amount",
       className: "tabular-nums",
       cell: (e) => (
         <span className={e.credits > 0 ? "text-success" : undefined}>
@@ -220,7 +220,7 @@ async function CreditHistory({
           <EmptyState
             icon={Wallet}
             title="No activity yet"
-            description="Each call your agent answers, and every credit top-up, shows up here."
+            description="Each call your agent answers, and every top-up, shows up here."
           />
         }
       />
@@ -245,7 +245,7 @@ async function BillingContent({
       <EmptyState
         icon={Wallet}
         title="Billing is for owners and admins"
-        description="Ask an owner or admin of your business to review credits and invoices."
+        description="Ask an owner or admin of your business to review billing and invoices."
       />
     );
   }
@@ -288,27 +288,29 @@ async function BillingContent({
           <strong>
             {postpaid
               ? "You have reached your credit limit, so your phone agent is paused."
-              : "You are out of credits, so your phone agent is paused."}
+              : "Your balance has run out, so your phone agent is paused."}
           </strong>{" "}
-          Contact support to {postpaid ? "settle your balance" : "add credits"}.
+          {postpaid
+            ? "Contact support to settle your balance."
+            : "Add funds below to resume calls."}
         </Notice>
       )}
       {lowBalance && (
         <Notice tone="warning">
           {postpaid
             ? "You are close to your credit limit. Calls will pause when it is reached."
-            : "Your credits are running low. Calls will pause when they run out."}
+            : "Your balance is running low. Calls will pause when they run out."}
         </Notice>
       )}
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label={postpaid ? "Balance" : "Credits left"}
+          label="Balance"
           value={formatCredits(wallet.balanceCredits)}
           hint={
             postpaid
               ? "Negative means usage not yet paid for"
-              : "1 credit per call minute, rounded up"
+              : "Each call is charged by its length"
           }
           icon={Wallet}
         />
@@ -352,18 +354,18 @@ async function BillingContent({
             description={
               postpaid
                 ? "Your first invoice is issued on the 1st of next month for this month's usage."
-                : "You are on prepaid credits, so there is nothing to invoice."
+                : "You pay in advance, so there is nothing to invoice."
             }
           />
         }
       />
-      <h2 className="mt-10 mb-3 text-lg font-semibold">Credit history</h2>
+      <h2 className="mt-10 mb-3 text-lg font-semibold">Transaction history</h2>
       <Suspense fallback={<Skeleton className="h-72 w-full rounded-xl" />}>
         <CreditHistory searchParams={searchParams} />
       </Suspense>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Billing months and due dates use UTC. Buy credits or pay an invoice.
+        Billing months and due dates use UTC. Add funds or pay an invoice.
       </p>
     </>
   );
@@ -374,7 +376,7 @@ export default function BillingPage({ searchParams }: PageProps<"/billing">) {
     <>
       <PageHeader
         title="Billing"
-        description="Your credits, usage and invoices."
+        description="Your balance, usage and invoices."
       />
       <Suspense fallback={<Skeleton className="h-56 w-full rounded-xl" />}>
         <BillingContent searchParams={searchParams} />

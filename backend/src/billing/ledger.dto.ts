@@ -29,6 +29,8 @@ export interface LedgerRow {
   note: string | null;
   paymentRef: string | null;
   providerCostCents: number | null;
+  marginPerMinute: number | null;
+  durationSeconds: number | null;
   callId: string | null;
   createdAt: Date;
   callRowId: string | null;
@@ -38,11 +40,11 @@ export interface LedgerRow {
 
 const tenantDescription: Record<string, string> = {
   call_charge: 'Call',
-  purchase: 'Credits purchased',
-  grant: 'Bonus credits',
+  purchase: 'Funds added',
+  grant: 'Bonus funds',
   adjustment: 'Balance adjustment',
   refund: 'Refund',
-  expiry: 'Credits expired',
+  expiry: 'Balance expired',
 };
 
 /**
@@ -73,7 +75,10 @@ export const toAdminLedgerDto = (r: LedgerRow) => ({
   balanceAfter: Number(r.balanceAfter),
   note: r.note,
   paymentRef: r.paymentRef,
-  providerCostCents: r.providerCostCents,
+  providerCostCents:
+    r.providerCostCents == null ? null : Number(r.providerCostCents),
+  marginPerMinute: r.marginPerMinute == null ? null : Number(r.marginPerMinute),
+  durationSeconds: r.durationSeconds,
   callId: r.callId,
   fromNumber: r.fromNumber,
   durationMs: r.durationMs,

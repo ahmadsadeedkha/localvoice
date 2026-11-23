@@ -47,20 +47,24 @@ describe('Retell billing integration', () => {
     const wallets = {
       chargeForCall: jest.fn().mockResolvedValue({ charged: false }),
     };
+    const pricing = { getMarginPerMinute: jest.fn().mockResolvedValue(0.1) };
     const processor = new RetellEventsProcessor(
       wallets as any,
       s.tenants as any,
       s.events as any,
       {} as any,
-      new ConfigService({ CREDITS_PER_MINUTE: 2.5 }),
+      new ConfigService({ ESTIMATED_COST_PER_MINUTE: 0.15 }),
+      pricing as any,
     );
     await processor.process({ name, data } as any);
     expect(wallets.chargeForCall).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId,
         callId: 'call-1',
-        credits: 2.5,
-        providerCostCents: 12,
+        credits: 0.13,
+        providerCostCents: 12.4,
+        marginPerMinute: 0.1,
+        durationSeconds: 1,
       }),
     );
     expect(s.events.update).toHaveBeenLastCalledWith(
@@ -113,10 +117,41 @@ describe('Retell billing integration', () => {
       s.tenants as any,
       s.events as any,
       {} as any,
-      new ConfigService({ CREDITS_PER_MINUTE: 1 }),
+      new ConfigService({ ESTIMATED_COST_PER_MINUTE: 0.15 }),
+      { getMarginPerMinute: jest.fn() } as any,
     );
     await processor.process({ name, data } as any);
     expect(wallets.backfillProviderCost).toHaveBeenCalledWith('call-1', 12);
     expect(wallets.chargeForCall).not.toHaveBeenCalled();
   });
+
+    it('estimates and flags the charge when Retell sent no cost', async () => {
+      const s = setup();
+      await s.service.ingest('call_ended', {
+        call_id: 'call-2',
+        metadata: { tenant_id: tenantId },
+        duration_ms: 60000,
+      });
+      const [name, data] = s.queue.add.mock.calls[0];
+      const wallets = {
+        chargeForCall: jest.fn().mockResolvedValue({ charged: false }),
+      };
+      const processor = new RetellEventsProcessor(
+        wallets as any,
+        s.tenants as any,
+        s.events as any,
+        {} as any,
+        new ConfigService({ ESTIMATED_COST_PER_MINUTE: 0.15 }),
+        { getMarginPerMinute: jest.fn().mockResolvedValue(0.1) } as any,
+      );
+      await processor.process({ name, data } as any);
+      // 15 cents estimated cost + 10 cents margin
+      expect(wallets.chargeForCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          credits: 0.25,
+          providerCostCents: null,
+          note: expect.stringContaining('estimated'),
+        }),
+      );
+    });
 });

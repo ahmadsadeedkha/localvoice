@@ -4,6 +4,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Job, Queue } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
 import { WalletService } from './wallet.service';
+import { PricingService } from './pricing.service';
+import { computeCallCharge } from './call-pricing';
 import { Tenant } from '../tenants/tenant.entity';
 import {
   WebhookEvent,
@@ -19,6 +21,7 @@ export class RetellEventsProcessor extends WorkerHost {
     @InjectRepository(WebhookEvent) private events: Repository<WebhookEvent>,
     @InjectQueue('notifications') private notifications: Queue,
     private readonly config: ConfigService,
+    private readonly pricing: PricingService,
   ) {
     super();
   }
@@ -72,21 +75,38 @@ export class RetellEventsProcessor extends WorkerHost {
     }
 
     const seconds = Math.ceil((call.duration_ms ?? 0) / 1000);
-    const credits =
-      Math.ceil(seconds / 60) *
-      this.config.getOrThrow<number>('CREDITS_PER_MINUTE');
-    if (credits <= 0) return tenantId; // never connected / zero duration
+    if (seconds <= 0) return tenantId; // never connected / zero duration
 
-    const cents =
-      call.call_cost?.combined_cost != null
-        ? Math.round(call.call_cost.combined_cost)
-        : null; // Retell's SDK defines combined_cost in cents; round to the ledger's integer cents.
+    // Retell's real cost for this call, in cents (fractions of a cent included).
+    // A connected call always costs something, so 0 or missing means "not final".
+    const reported = call.call_cost?.combined_cost;
+    const hasCost =
+      typeof reported === 'number' && Number.isFinite(reported) && reported > 0;
+    // Last resort: estimate the cost, flag the row, and let call_analyzed backfill
+    // the real figure into provider_cost_cents.
+    const costCents = hasCost
+      ? reported
+      : (this.config.getOrThrow<number>('ESTIMATED_COST_PER_MINUTE') *
+          100 *
+          seconds) /
+        60;
+
+    const marginPerMinute = await this.pricing.getMarginPerMinute();
+    const credits = computeCallCharge({
+      providerCostCents: costCents,
+      durationSeconds: seconds,
+      marginPerMinute,
+    });
+    if (credits <= 0) return tenantId;
 
     const r = await this.wallets.chargeForCall({
       tenantId,
       callId: call.call_id,
       credits,
-      providerCostCents: cents,
+      providerCostCents: hasCost ? reported : null,
+      marginPerMinute,
+      durationSeconds: seconds,
+      note: hasCost ? null : 'Provider cost missing from Retell; estimated',
     });
     if (!r.charged) return tenantId;
 
@@ -113,7 +133,7 @@ export class RetellEventsProcessor extends WorkerHost {
     if (call.call_cost?.combined_cost != null) {
       await this.wallets.backfillProviderCost(
         call.call_id,
-        Math.round(call.call_cost.combined_cost),
+        call.call_cost.combined_cost,
       );
     }
     return tenantId;

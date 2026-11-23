@@ -9,7 +9,9 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Optional,
 } from '@nestjs/common';
+import { PricingService } from './pricing.service';
 
 export type CallGate =
   | { allowed: true; maxDurationMs: number }
@@ -26,6 +28,7 @@ export class WalletService {
   constructor(
     private ds: DataSource,
     private readonly config: ConfigService,
+    @Optional() private readonly pricing?: PricingService,
   ) {}
 
   async chargeForCall(p: {
@@ -33,6 +36,9 @@ export class WalletService {
     callId: string;
     credits: number;
     providerCostCents: number | null;
+    marginPerMinute?: number | null;
+    durationSeconds?: number | null;
+    note?: string | null;
   }) {
     return this.ds.transaction(async (m) => {
       // lock the wallet row so concurrent calls charge one at a time
@@ -57,6 +63,9 @@ export class WalletService {
         balanceAfter: after,
         callId: p.callId,
         providerCostCents: p.providerCostCents,
+        marginPerMinute: p.marginPerMinute ?? null,
+        durationSeconds: p.durationSeconds ?? null,
+        note: p.note ?? null,
       });
 
       wallet.balanceCredits = after;
@@ -98,7 +107,12 @@ export class WalletService {
       return { allowed: false, reason: 'invoice_unpaid' };
     }
 
-    const perMinute = this.config.getOrThrow<number>('CREDITS_PER_MINUTE');
+    // what one more call minute is expected to cost this tenant
+    const estimatedCost = this.config.getOrThrow<number>(
+      'ESTIMATED_COST_PER_MINUTE',
+    );
+    const margin = (await this.pricing?.getMarginPerMinute()) ?? 0;
+    const perMinute = estimatedCost + margin;
     const minMinutes = this.config.getOrThrow<number>('MIN_CALL_MINUTES');
     const maxMinutes = this.config.getOrThrow<number>('MAX_CALL_MINUTES');
 
@@ -122,7 +136,7 @@ export class WalletService {
     if (!gate.allowed) {
       throw new HttpException(
         {
-          message: 'Insufficient credits or billing hold',
+          message: 'Insufficient balance or billing hold',
           reason: gate.reason,
         },
         HttpStatus.PAYMENT_REQUIRED,
@@ -151,6 +165,8 @@ export class WalletService {
         `SELECT l.id, l.type, l.credits, l.balance_after AS "balanceAfter",
                 l.note, l.payment_ref AS "paymentRef",
                 l.provider_cost_cents AS "providerCostCents",
+                l.margin_per_minute AS "marginPerMinute",
+                l.duration_seconds AS "durationSeconds",
                 l.call_id AS "callId", l.created_at AS "createdAt",
                 c.id AS "callRowId", c.from_number AS "fromNumber",
                 c.duration_ms AS "durationMs"

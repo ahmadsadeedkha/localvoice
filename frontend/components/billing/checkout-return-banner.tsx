@@ -27,12 +27,12 @@ const VIEWS: Record<
     spin: true,
   },
   credited: {
-    text: "Payment confirmed. Credits have been added to your balance.",
+    text: "Payment confirmed. Funds have been added to your balance.",
     cls: "bg-success-soft text-success",
     Icon: CheckCircle2,
   },
   delayed: {
-    text: "Your payment went through. Credits can take a minute to appear. Refresh the page if you don't see them.",
+    text: "Your payment went through. Your balance can take a minute to update. Refresh the page if you don't see them.",
     cls: "bg-warning-soft text-warning",
     Icon: Clock,
   },

@@ -38,7 +38,11 @@ export type BillingOverview = {
 };
 
 export function formatCredits(n: number): string {
-  return new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 }).format(n);
+  // 1 credit = $1, so balances are shown as dollars
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(n);
 }
 
 export function formatMoney(
