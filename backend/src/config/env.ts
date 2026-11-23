@@ -14,12 +14,12 @@ const schema = z
     RETELL_AGENT_ID: z.string().min(1),
     BLOCKED_FALLBACK_AGENT_ID: z.string().trim().min(1).optional(),
     ENABLE_DEV_CALLS: z.enum(['true', 'false']).default('false'),
-    CREDITS_PER_MINUTE: z.coerce
+    ESTIMATED_COST_PER_MINUTE: z.coerce
       .number()
       .positive()
-      .max(100000)
+      .max(100)
       .multipleOf(0.01)
-      .default(1),
+      .default(0.15),
     MIN_CALL_MINUTES: z.coerce.number().int().min(1).max(120).default(2),
     MAX_CALL_MINUTES: z.coerce.number().int().min(1).max(120).default(30),
     TELNYX_API_KEY: z.string().optional(),

@@ -32,30 +32,30 @@ it('validates optional call controls before they can enable production routes', 
 
 it('supplies numeric billing defaults and parses configured rates', () => {
   expect(validateEnv(base)).toMatchObject({
-    CREDITS_PER_MINUTE: 1,
+    ESTIMATED_COST_PER_MINUTE: 0.15,
     MIN_CALL_MINUTES: 2,
     MAX_CALL_MINUTES: 30,
   });
   expect(
     validateEnv({
       ...base,
-      CREDITS_PER_MINUTE: '2.50',
+      ESTIMATED_COST_PER_MINUTE: '2.50',
       MIN_CALL_MINUTES: '1',
       MAX_CALL_MINUTES: '15',
     }),
   ).toMatchObject({
-    CREDITS_PER_MINUTE: 2.5,
+    ESTIMATED_COST_PER_MINUTE: 2.5,
     MIN_CALL_MINUTES: 1,
     MAX_CALL_MINUTES: 15,
   });
 });
 
 it.each([
-  { CREDITS_PER_MINUTE: '0' },
-  { CREDITS_PER_MINUTE: '-1' },
-  { CREDITS_PER_MINUTE: 'NaN' },
-  { CREDITS_PER_MINUTE: 'Infinity' },
-  { CREDITS_PER_MINUTE: '0.001' },
+  { ESTIMATED_COST_PER_MINUTE: '0' },
+  { ESTIMATED_COST_PER_MINUTE: '-1' },
+  { ESTIMATED_COST_PER_MINUTE: 'NaN' },
+  { ESTIMATED_COST_PER_MINUTE: 'Infinity' },
+  { ESTIMATED_COST_PER_MINUTE: '0.001' },
   { MIN_CALL_MINUTES: '0' },
   { MIN_CALL_MINUTES: '1.5' },
   { MAX_CALL_MINUTES: '121' },

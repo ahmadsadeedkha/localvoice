@@ -44,7 +44,7 @@ export class StripeProvider implements PaymentsProvider {
             price_data: {
               currency: input.currency,
               unit_amount: input.amountCents,
-              product_data: { name: 'LocalVoice credits' },
+              product_data: { name: 'LocalVoice balance top-up' },
             },
           },
         ],

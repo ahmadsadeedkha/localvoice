@@ -53,7 +53,7 @@ export class RetellInboundController {
     try {
       const matches = await this.tenants
         .createQueryBuilder('t')
-        .select(['t.id', 't.status', 't.retellAgentId'])
+        .select(['t.id', 't.status', 't.retellAgentId', 't.name', 't.timezone'])
         .where(
           `t.telnyxNumber = :number OR EXISTS (
           SELECT 1 FROM phone_numbers p WHERE p.tenant_id = t.id AND p.e164 = :number
@@ -94,6 +94,10 @@ export class RetellInboundController {
       return {
         call_inbound: {
           override_agent_id: selectedAgentId,
+          dynamic_variables: {
+            business_name: tenant.name,
+            timezone: tenant.timezone,
+          },
           metadata: { tenant_id: tenant.id }, // resolveTenantId reads this at call_ended
           agent_override: {
             agent: { max_call_duration_ms: gate.maxDurationMs },

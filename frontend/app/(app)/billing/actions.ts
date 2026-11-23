@@ -17,7 +17,7 @@ export async function startCheckout(
     ));
   } catch (e) {
     if (e instanceof ApiError && e.status === 403) {
-      return { ok: false, error: "Only owners and admins can buy credits." };
+      return { ok: false, error: "Only owners and admins can add funds." };
     }
     if (e instanceof ApiError && e.status === 400) {
       return { ok: false, error: e.detail ?? "That amount can't be used." };

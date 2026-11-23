@@ -30,9 +30,10 @@ export function BuyCreditsCard() {
 
   return (
     <section className="rounded-xl border bg-card p-5">
-      <h2 className="text-lg font-semibold">Buy credits</h2>
+      <h2 className="text-lg font-semibold">Add funds</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        1 credit = $1. Minimum ${MIN_USD}, maximum ${MAX_USD}.
+        Funds are added to your balance in US dollars. Minimum ${MIN_USD},
+        maximum ${MAX_USD}.
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">

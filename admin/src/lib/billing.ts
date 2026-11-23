@@ -40,9 +40,10 @@ export type NeedsPricingItem = {
 };
 
 export function formatCredits(n: number): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(
-    n,
-  );
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(n);
 }
 
 export function formatMoney(amount: number | null, currency: string | null) {
@@ -75,7 +76,7 @@ export function formatDate(iso: string): string {
 }
 
 export const blockedLabel: Record<NonNullable<BlockedReason>, string> = {
-  no_balance: "Out of credits",
+  no_balance: "Out of balance",
   invoice_unpaid: "Invoice overdue",
 };
 
@@ -96,6 +97,8 @@ export type AdminLedgerEntry = {
   note: string | null;
   paymentRef: string | null;
   providerCostCents: number | null;
+  marginPerMinute: number | null;
+  durationSeconds: number | null;
   callId: string | null;
   fromNumber: string | null;
   durationMs: number | null;
