@@ -41,6 +41,9 @@ const schema = z
     STRIPE_SECRET_KEY: z.string().min(1),
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
     DEFAULT_MARGIN_PER_MINUTE: z.coerce.number().min(0).max(100).default(0.1),
+    BREVO_API_KEY: z.string().optional(),
+    EMAIL_FROM_ADDRESS: z.string().optional(),
+    EMAIL_FROM_NAME: z.string().default('LocalVoice AI'),
     ALLOWED_ORIGINS: z
       .string()
       .default('http://localhost:3000,http://localhost:5173'),
