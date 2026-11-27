@@ -16,6 +16,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { navItems } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 
 function Brand() {
   return (
@@ -112,6 +113,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
 
           <div className="ml-auto flex items-center gap-2">
+            <NotificationBell />
             <ThemeToggle />
             <UserButton />
           </div>

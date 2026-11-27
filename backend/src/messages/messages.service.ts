@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { type CallContext } from '../calls/call-context.types';
@@ -28,7 +30,11 @@ const toDto = (r: any) => ({
 
 @Injectable()
 export class MessagesService {
-  constructor(@InjectDataSource() private readonly ds: DataSource) {}
+  private readonly log = new Logger(MessagesService.name);
+  constructor(
+    @InjectDataSource() private readonly ds: DataSource,
+    @InjectQueue('notifications') private readonly notifications: Queue,
+  ) {}
 
   private async callerId(call: CallContext): Promise<string | null> {
     const rows = await this.ds.query(
@@ -75,6 +81,21 @@ export class MessagesService {
        RETURNING id`,
       [call.tenantId, call.callId, callerName, callerPhone, body],
     );
+
+    // never let a notification problem break the call: the message is already saved
+    await this.notifications
+      .add('new-message', {
+        tenantId: call.tenantId,
+        messageId: rows[0].id,
+        callerName,
+        callerPhone,
+        body,
+      })
+      .catch((e: unknown) =>
+        this.log.error(
+          `Could not queue new-message notification: ${e instanceof Error ? e.message : String(e)}`,
+        ),
+      );
     return this.savedResponse(rows[0].id);
   }
 

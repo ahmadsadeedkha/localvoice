@@ -18,6 +18,7 @@ import { GoogleCalendarModule } from './integrations/google/google-calendar.modu
 import { CalendarSyncModule } from './calendar-sync/calendar-sync.module';
 import { BillingModule } from './billing/billing.module';
 import { PaymentsModule } from './payments/payments.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { PaymentsModule } from './payments/payments.module';
     CalendarSyncModule,
     BillingModule,
     PaymentsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
 })
